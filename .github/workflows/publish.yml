@@ -57,7 +57,13 @@ jobs:
             texlive-latex-base \
             texlive-latex-recommended \
             texlive-latex-extra \
-            texlive-fonts-recommended
+            texlive-fonts-recommended \
+            cm-super
+          # cm-super provides the Type 1 EC-font outlines (ecrm1000.pfb, etc.)
+          # that \usepackage[T1]{fontenc} needs. Without it, pdflatex falls back
+          # to Type 3 bitmap fonts with no ToUnicode CMap, and the fixture PDFs
+          # yield mojibake/empty text on Linux. The package's postinst runs
+          # `updmap-sys`, which enables the cm-super map automatically.
 
       - name: Build PDF test fixtures
         run: uv run python tests/fixtures/build_fixtures.py
