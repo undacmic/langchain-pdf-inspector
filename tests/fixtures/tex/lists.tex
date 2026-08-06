@@ -1,0 +1,40 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\begin{document}
+
+\section{Shopping and Tasks}
+This list-heavy fixture exercises both \texttt{itemize} and \texttt{enumerate}
+environments, including nested lists, so that the tests can confirm bulleted
+and numbered content is extracted as readable text.
+
+\subsection{Bullet Points}
+\begin{itemize}
+  \item The first bullet item mentions the unique marker
+        \texttt{listsentinel-quark}.
+  \item A second ordinary bullet about stacking the shelves and tidying the
+        pantry before the weekend.
+  \item A third bullet that wraps across multiple lines to ensure that
+        line-wrapped list text is extracted as a single logical item rather
+        than being split awkwardly.
+  \begin{itemize}
+    \item A nested bullet under the third item, carrying the marker
+          \texttt{listsentinel-nested}.
+    \item Another nested bullet without a marker, purely for depth.
+  \end{itemize}
+\end{itemize}
+
+\subsection{Numbered Steps}
+\begin{enumerate}
+  \item The first enumerated step references the marker
+        \texttt{listsentinel-neutrino}.
+  \item The second step requires mixing the reagents and stirring gently for
+        at least ten minutes.
+  \item The third step repeats the marker \texttt{listsentinel-neutrino} to
+        reinforce the assertion that enumerated content is preserved.
+  \begin{enumerate}
+    \item A nested numbered sub-step beneath the third item.
+  \end{enumerate}
+\end{enumerate}
+
+\end{document}

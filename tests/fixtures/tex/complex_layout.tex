@@ -1,0 +1,91 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{multicol}
+\usepackage{booktabs}
+\begin{document}
+
+\title{Complex Layout with Image}
+\author{Fixture Author}
+\date{\today}
+\maketitle
+
+\section{Introduction to the Complex Layout}
+This fixture is the Stage 3 example: a genuinely complex document layout that
+combines a title block, section headings, an embedded raster image, text
+wrapping around that image, a multi-column region, and a table all in one
+document. Its primary assertion target is the section heading
+\textbf{Complex Layout with Image} and the prose marker
+\texttt{layoutsentinel-intro}, which appears only here and nowhere else in the
+document.
+
+\begin{wrapfigure}{r}{0.4\textwidth}
+  \centering
+  \includegraphics[width=0.35\textwidth]{sample.png}
+  \caption{Sentinel image caption for the wrapped figure.}
+  \label{fig:sample}
+\end{wrapfigure}
+
+The image above is embedded as a solid-color square with no text content. The
+surrounding prose, however, is meant to be extracted, and it carries the
+distinctive marker \texttt{layoutsentinel-wrap}. The \texttt{wrapfig}
+environment places the figure on the right and lets this paragraph flow around
+it, so the physical layout here is more complex than the plain single-column
+fixtures. When this document is parsed, the text of this paragraph should still
+be recovered even though the figure sits beside it.
+
+Additional filler prose follows so that the wrapping behavior is visually
+obvious and the paragraph genuinely extends beside the figure rather than
+merely sitting above or below it. This describes the seasonal variation of
+precipitation across the northern uplands, the gradual retreat of the glaciers,
+and the corresponding shift in the distribution of alpine vegetation. None of
+this filler carries a sentinel; it exists purely to give the layout real body
+so the test fixture reads as an authentic complex page rather than a toy.
+
+\section{Multi-Column Region}
+\begin{multicols}{2}
+In this section the text flows across two columns. The left-hand content
+begins here and continues into the second column automatically. The marker
+\texttt{layoutsentinel-multicol} is placed in this two-column region so that
+the tests can confirm that multi-column text is still extracted as readable
+prose, just as in the earlier two-column fixture. Additional narrative about
+the measurement campaign, the calibration of the instruments, and the number of
+recordings taken per season follows to give the columns reasonable height.
+
+The second column carries the marker \texttt{layoutsentinel-multicol-2}. It
+repeats the theme of the previous column while adding further detail about the
+data processing pipeline: the raw readings are smoothed, outliers are flagged,
+and the resulting series are aggregated into the summary table shown below.
+Together these two sentinels let the tests verify that text spanning a
+multi-column break is recovered intact.
+\end{multicols}
+
+\section{Summary Table}
+The document also embeds a \texttt{tabular} table so that table extraction can
+be exercised alongside the image and multi-column features. The table below
+carries the sentinel \texttt{layoutsentinel-table} in its first data cell.
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Region & Recordings & Flag \\
+\midrule
+layoutsentinel-table & 128 & active \\
+Northern & 64 & active \\
+Alpine & 32 & retired \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Conclusion}
+This concluding section spans the second page of the fixture and re-states the
+heading \textbf{Complex Layout with Image} alongside the marker
+\texttt{layoutsentinel-conclusion}. It ensures the document runs to at least
+two pages and that a reliable, text-only assertion target exists on the final
+page regardless of how the image is routed during extraction. The image itself
+is blank, so the automated tests deliberately assert only on the surrounding
+text and heading.
+
+\end{document}

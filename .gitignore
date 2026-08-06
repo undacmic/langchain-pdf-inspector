@@ -1,0 +1,73 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.ipynb
+
+# Build / distribution artifacts
+build/
+dist/
+.eggs/
+*.egg-info/
+*.egg
+
+# Test / coverage tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mutation_cache/
+
+# ---------------------------------------------------------------------------
+# uv / virtual environments
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+env/
+.env
+.venv.bak/
+
+# ---------------------------------------------------------------------------
+# IDE / tooling
+# ---------------------------------------------------------------------------
+.idea/
+.playwright-mcp/
+.vscode/
+.agents/
+
+# ---------------------------------------------------------------------------
+# macOS
+# ---------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+# ---------------------------------------------------------------------------
+# LaTeX-generated PDF test fixtures (build artifacts)
+#
+# The PDFs under tests/fixtures/ are generated from the tracked .tex sources
+# in tests/fixtures/tex/ by `tests/fixtures/build_fixtures.py`. They are
+# reproducible build artifacts and are NOT tracked.
+#
+# The .tex sources themselves ARE tracked — never ignore them.
+# ---------------------------------------------------------------------------
+tests/fixtures/*.pdf
+
+# LaTeX auxiliary files produced during compilation. The build script cleans
+# these up, but ignore them defensively anywhere they might appear.
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Duplicate of the tracked tests/fixtures/sample.png, copied into the tex dir
+# for compilation. It is a redundant copy of a tracked asset, so ignore it.
+tests/fixtures/tex/sample.png

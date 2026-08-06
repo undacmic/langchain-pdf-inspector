@@ -1,0 +1,41 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\title{Incremental Heading Fixture}
+\author{Fixture Author}
+\date{\today}
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This introductory section introduces the headings fixture. It contains the
+distinctive term \texttt{headingfixture-zephyr}, which appears nowhere else in
+the document, and is used by the tests to confirm that body text written under
+a section heading is extracted faithfully. The paragraph is intentionally long
+enough to wrap onto several lines so that extraction must reassemble wrapped
+lines correctly.
+
+\section{Core Findings}
+A second top-level section follows the introduction and discusses the main
+observations of the fixture. It provides a second standalone heading so that
+tests can distinguish between multiple top-level sections rather than relying
+on a single one.
+
+\subsection{Methodology}
+The methodology subsection describes how the fixture was produced. It repeats
+the unique marker \texttt{headingfixture-zephyr} in a different paragraph so
+that the content assertion remains robust whether or not the first occurrence
+survives extraction intact.
+
+\subsection{Results}
+Results are summarized in plain prose here. Additional filler text about
+measurement tolerances and instrument calibration ensures the subsection
+contains enough content to be worth asserting on.
+
+\section{Conclusion}
+The conclusion wraps up the headings fixture and reiterates that the title and
+section structure should be preserved in the extracted markdown so that heading
+levels remain visible to downstream consumers.
+
+\end{document}

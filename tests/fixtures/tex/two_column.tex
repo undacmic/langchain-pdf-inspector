@@ -1,0 +1,26 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{multicol}
+\begin{document}
+
+\begin{multicols}{2}
+
+\section{Left Hand Column}
+The left column begins with this section. It carries the distinctive marker
+\texttt{columnsentinel-left}, which the tests use to confirm that text placed
+in the left column of a two-column layout is extracted. Additional filler
+prose about botany and seasonal rainfall follows so that the left column
+achieves a reasonable height and the layout genuinely flows across the two
+columns rather than collapsing into a single narrow strip.
+
+\section{Right Hand Column}
+The right column carries its own distinctive marker
+\texttt{columnsentinel-right}. This text appears on the same page but in the
+second column, which is the point of this fixture: to verify that two-column
+layout is still extracted as readable text, with content from both columns
+present in the output even though their physical positions on the page differ.
+
+\end{multicols}
+
+\end{document}

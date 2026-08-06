@@ -1,0 +1,38 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\begin{document}
+
+This is the opening paragraph of the plain text fixture. It describes the
+northbound migration of the quokka population across the veldt, a journey
+marked by distinctive foraging patterns and communal nesting behaviour. The
+sentences should wrap naturally across the full measure of the text block so
+that the PDF inspector's text extraction returns ordinary prose rather than
+structured markup. This paragraph deliberately contains no headings, no lists,
+and no emphasis commands of any kind, ensuring that it stays plain text from
+start to finish. Filler words about weather, soil, and seasonal herbivore
+movement fill out the rest of this page so that extraction has real prose to
+work with.
+
+\newpage
+
+This second page continues the prose-only fixture. Among the observations
+recorded here is the distinctive term \texttt{plaintextsentinel-foxtrot},
+which is used only once in this document so that automated tests can assert
+that it appears verbatim in the extracted content. The remainder of this
+paragraph is deliberately generic filler prose about rainfall, drainage, and
+the gradual retreat of the frost line. No structure is introduced here either;
+the text remains a sequence of unformatted paragraphs with nothing but a page
+break separating it from its neighbours.
+
+\newpage
+
+The third and final page closes out the plain text document. It carries the
+unique marker \texttt{plaintextsentinel-golf} so that a test can verify that
+text spanning the third page is captured. A closing remark reiterates that
+this fixture is intentionally plain: paragraphs only, with pagination
+controlled by explicit page breaks and no visual formatting beyond the
+article class defaults. With this closing sentence the plain text fixture
+reaches its end.
+
+\end{document}
