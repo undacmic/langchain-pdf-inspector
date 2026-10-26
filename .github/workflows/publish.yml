@@ -50,25 +50,10 @@ jobs:
       - name: Install runtime + dev dependencies
         run: uv sync --group dev --locked
 
-      - name: Install TeX Live (for PDF fixtures)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            texlive-latex-base \
-            texlive-latex-recommended \
-            texlive-latex-extra \
-            texlive-fonts-recommended \
-            cm-super
-          # cm-super provides the Type 1 EC-font outlines (ecrm1000.pfb, etc.)
-          # that \usepackage[T1]{fontenc} needs. Without it, pdflatex falls back
-          # to Type 3 bitmap fonts with no ToUnicode CMap, and the fixture PDFs
-          # yield mojibake/empty text on Linux. The package's postinst runs
-          # `updmap-sys`, which enables the cm-super map automatically.
+      - name: Verify checked-in PDF fixtures (no TeX required)
+        run: uv run python tests/fixtures/build_fixtures.py --check
 
-      - name: Build PDF test fixtures
-        run: uv run python tests/fixtures/build_fixtures.py
-
-      - name: Run tests
+      - name: Run tests (real fixtures, no missing-fixture skips)
         run: uv run pytest
 
   build:
@@ -87,6 +72,9 @@ jobs:
 
       - name: Build distributions
         run: uv build
+
+      - name: Check distribution contents
+        run: python3 tests/check_distribution.py
 
       - name: Upload distributions
         uses: actions/upload-artifact@v7

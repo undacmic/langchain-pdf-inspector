@@ -46,21 +46,23 @@ def fixtures_dir() -> Path:
 
 
 def _pdf_fixture(name: str):
-    """Factory for a fixture that returns the absolute path to a built PDF.
+    """Factory for a fixture that returns the absolute path to a checked-in PDF.
 
-    The PDFs are produced by ``tests/fixtures/build_fixtures.py`` (LaTeX), so
-    they may be absent on machines without a LaTeX engine. In that case the
-    fixture skips the test with an actionable message rather than failing.
+    The PDFs are checked into ``tests/fixtures/`` and never built by the test
+    run, so no LaTeX engine is required. A missing fixture fails the test with
+    an actionable message instead of silently skipping integration coverage.
     """
 
     @pytest.fixture
     def _fixture(fixtures_dir: Path) -> Path:
         path = fixtures_dir / name
-        if not path.is_file():
-            pytest.skip(
-                f"Fixture PDF {name!r} not found. Build the fixtures with "
+        if not path.is_file() or path.stat().st_size == 0:
+            pytest.fail(
+                f"Required checked-in fixture PDF {name!r} is missing or empty "
+                f"at {path}. Restore the tracked PDF (CI requires it) or "
+                "regenerate it with "
                 "`uv run python tests/fixtures/build_fixtures.py` "
-                "(requires a LaTeX engine such as pdflatex or tectonic)."
+                "(regeneration requires pdflatex; running tests does not)."
             )
         return path
 
@@ -75,3 +77,5 @@ tables_pdf = _pdf_fixture("tables.pdf")
 complex_layout_pdf = _pdf_fixture("complex_layout.pdf")
 cropbox_offset_pdf = _pdf_fixture("cropbox_offset.pdf")
 document_info_pdf = _pdf_fixture("document_info.pdf")
+tagged_structure_pdf = _pdf_fixture("tagged_structure.pdf")
+rotated_text_pdf = _pdf_fixture("rotated_text.pdf")
