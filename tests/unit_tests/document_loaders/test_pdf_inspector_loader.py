@@ -15,6 +15,8 @@ from langchain_core.documents.base import Blob
 from langchain_pdf_inspector import PdfInspectorLoader
 from langchain_pdf_inspector.pdf_inspector_loader import BasePDFLoader
 
+from ._markup import has_list_item, normalize_table_markup
+
 # Conftest fixture names that resolve to the absolute path of each built PDF
 # (skipping the test with an actionable message when the PDF is absent).
 FIXTURE_NAMES = [
@@ -83,8 +85,8 @@ class TestSingleMode:
     def test_single_mode_plain_text_is_full_prose(self, plain_text_pdf: Path) -> None:
         """Plain-text output contains prose from every page of the fixture."""
         content = PdfInspectorLoader(str(plain_text_pdf)).load()[0].page_content
-        # Note: "fixture" is extracted with the ``fi`` ligature (U+FB01), so the
-        # prose assertion stops before that word.
+        # Note: "fixture" is still extracted with the ``fi`` ligature (U+FB01)
+        # on pdf-inspector 1.25.2, so the prose assertion stops before that word.
         assert "This is the opening paragraph of the plain text" in content
         assert "plaintextsentinel-foxtrot" in content
         assert "plaintextsentinel-golf" in content
@@ -207,8 +209,9 @@ class TestMarkdownOutput:
             PdfInspectorLoader(str(lists_pdf), output="markdown").load()[0].page_content
         )
         assert "# 1 Shopping and Tasks" in content
-        assert "\u2022" in content  # pdf-inspector emits U+2022 bullets, not "-" or "*"
-        assert "listsentinel-quark" in content
+        # Bullet glyphs are renderer-dependent (U+2022, "-", ...), so assert
+        # that the item keeps a list marker rather than one exact glyph.
+        assert has_list_item(content, "listsentinel-quark")
         assert "listsentinel-nested" in content
 
     def test_markdown_preserves_table_rows(self, tables_pdf: Path) -> None:
@@ -218,8 +221,9 @@ class TestMarkdownOutput:
             .load()[0]
             .page_content
         )
-        assert "|tablesentinel-beta|" in content
-        assert "|widget|3 active|" in content
+        table = normalize_table_markup(content)
+        assert "|tablesentinel-beta|<empty>|7 active|" in table
+        assert "|widget|<empty>|3 active|" in table
         assert "Metric" in content
         assert "tablesentinel-alpha" in content
         assert "tablesentinel-gamma" in content
@@ -233,8 +237,9 @@ class TestMarkdownOutput:
             .load()[0]
             .page_content
         )
-        assert "|Region|Recordings|Flag|" in content
-        assert "|layoutsentinel-table|128|active|" in content
+        table = normalize_table_markup(content)
+        assert "|Region|Recordings|Flag|" in table
+        assert "|layoutsentinel-table|128|active|" in table
 
 
 @pytest.mark.requires("pdf_inspector")
@@ -315,8 +320,10 @@ class TestMetadataMerging:
             assert doc.metadata["source"] == str(plain_text_pdf)
             assert "total_pages" in doc.metadata
 
-    def test_caller_metadata_wins_on_key_conflict(self, plain_text_pdf: Path) -> None:
-        """A caller value overrides a parser key (``page``) on conflict."""
+    def test_caller_metadata_wins_on_key_conflict(
+        self, plain_text_pdf: Path, document_info_pdf: Path
+    ) -> None:
+        """Caller values override parser keys, including the new doc-info keys."""
         loader = PdfInspectorLoader(
             str(plain_text_pdf),
             mode="page",
@@ -326,6 +333,23 @@ class TestMetadataMerging:
         )
         for doc in loader.load():
             assert doc.metadata["page"] == 99
+
+        # `title`/`author` are the collisions introduced by document-info
+        # extraction: the caller must still win while the other six fields
+        # from the PDF survive.
+        loader = PdfInspectorLoader(
+            str(document_info_pdf),
+            metadata={"title": "Caller Title", "author": "Caller Author"},
+        )
+        metadata = loader.load()[0].metadata
+        assert metadata["title"] == "Caller Title"
+        assert metadata["author"] == "Caller Author"
+        assert metadata["subject"] == "Metadata extraction"
+        assert metadata["keywords"] == "alpha, beta, gamma"
+        assert metadata["creator"] == "pdfinfo-probe"
+        assert metadata["producer"] == "pdfinfo-probe producer"
+        assert metadata["creation_date"] == "D:20240115103000+01'00'"
+        assert metadata["mod_date"] == "D:20240220120000+01'00'"
 
 
 @pytest.mark.requires("pdf_inspector")

@@ -6,7 +6,7 @@ A LangChain `DocumentLoader` integration that wraps the Rust-backed [`pdf-inspec
 [![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)](LICENSE)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![LangChain Core](https://img.shields.io/badge/langchain--core-1.5+-blue.svg)](https://python.langchain.com/docs/introduction/)
-[![pdf-inspector](https://img.shields.io/badge/pdf--inspector-0.2.6+-blue.svg)](https://pypi.org/project/pdf-inspector/)
+[![pdf-inspector](https://img.shields.io/badge/pdf--inspector-1.25.2+-blue.svg)](https://pypi.org/project/pdf-inspector/)
 [![PyPI](https://img.shields.io/pypi/v/langchain-pdf-inspector.svg)](https://pypi.org/project/langchain-pdf-inspector/)
 
 ## Introduction
@@ -23,8 +23,8 @@ A LangChain `DocumentLoader` integration that wraps the Rust-backed [`pdf-inspec
 ## Requirements
 
 - Python 3.12 or higher
-- langchain-core 1.5.3 or higher
-- pdf-inspector 0.2.6 or higher
+- langchain-core 1.5.3 or higher (below 2.0)
+- pdf-inspector 1.25.2 or higher (below 2.0)
 
 ## Installation
 
@@ -36,7 +36,7 @@ pip install langchain-pdf-inspector
 uv add langchain-pdf-inspector
 ```
 
-Installing `langchain-pdf-inspector` also installs its pinned runtime dependencies, `langchain-core` and `pdf-inspector`. `pdf-inspector` is a required dependency; if it is missing, constructing the loader or parser raises a friendly `ImportError` telling you to run `pip install pdf-inspector`.
+Installing `langchain-pdf-inspector` also installs its required runtime dependencies, `langchain-core` and `pdf-inspector`. `pdf-inspector` is a required dependency; if it is missing, constructing the loader or parser raises a friendly `ImportError` telling you to run `pip install pdf-inspector`.
 
 To install from source instead, clone the repository and run `pip install .` (or `uv add .`) from the repo root.
 
@@ -79,11 +79,11 @@ for doc in loader.lazy_load():
     print(doc.metadata["page"], doc.page_content[:80])
 ```
 
-Every `Document` carries `source` and a 1-indexed `page`; `pdf_type` and `total_pages` are attached whenever page detection succeeds. Caller-supplied metadata is merged on top of these keys, and wins on conflicts.
+Every `Document` carries `source` and a 1-indexed `page`; `pdf_type` and `total_pages` are attached whenever page detection succeeds. The PDF's own document information is surfaced too, under the `pdf-inspector` field names: `title`, `author`, `subject`, `keywords`, `creator`, `producer`, `creation_date`, and `mod_date` (all strings). Fields the PDF does not provide — or provides as empty — are omitted rather than emitted as `null`. Caller-supplied metadata is merged on top of these keys, and wins on conflicts.
 
 ### One document per page
 
-`mode="page"` splits the PDF into one `Document` per page and requires `pages`, a non-empty list of 0-indexed pages. In page mode the content branches on `output`: `output="markdown"` yields per-page markdown with layout flags (`needs_ocr`, `has_tables`, `has_multicolumn_layout`); `output="text"` yields per-page positional or region-cropped text and requires `extract_positions` or `extract_regions`:
+`mode="page"` splits the PDF into one `Document` per page and requires `pages`, a non-empty list of 0-indexed pages. `pages` is 0-indexed for every mode and extraction path, so the same selection returns the same logical pages from positional text and markdown. Negative indices raise `ValueError`. Out-of-range indices are not validated: both paths silently omit pages that do not exist (markdown skips them using the detected page count, so it no longer emits an empty `Document` for them). Duplicate indices yield one `Document` per page from positional text, but one `Document` per occurrence (in the requested order) from markdown. In page mode the content branches on `output`: `output="markdown"` yields per-page markdown with layout flags (`needs_ocr`, `has_tables`, `has_multicolumn_layout`); `output="text"` yields per-page positional or region-cropped text and requires `extract_positions` or `extract_regions`:
 
 ```python
 loader = PdfInspectorLoader(
@@ -118,6 +118,8 @@ for doc in loader.load():
 ### Region extraction
 
 Set `extract_regions=True` and pass `page_regions` to crop text to `[x0, y0, x1, y1]` rectangles. `extract_regions` requires `page_regions` and is mutually exclusive with `extract_positions`:
+
+Region coordinates are in PDF points with a **top-left origin** and `y` increasing downward, measured relative to the **visible page box** — the intersection of the page's CropBox and MediaBox. They are *not* relative to the MediaBox. The two coincide when the CropBox starts at `(0, 0)`, which is the common case; on pages with a non-zero CropBox origin, measure from the top-left of the visible (cropped) area instead.
 
 ```python
 # Single mode: one joined Document cropped to the given regions
@@ -187,7 +189,7 @@ The repo ships a [dev container](.devcontainer/devcontainer.json) (VS Code, Pyth
 
 ## Creating Test Documents
 
-Test fixtures are PDFs compiled from LaTeX sources under `tests/fixtures/tex/` by `tests/fixtures/build_fixtures.py`. Six fixtures are staged for incremental complexity — `plain_text`, `headings`, `lists`, `two_column`, `tables`, and `complex_layout`. The `.tex` sources are tracked; the built PDFs are gitignored build artifacts.
+Test fixtures are PDFs compiled from LaTeX sources under `tests/fixtures/tex/` by `tests/fixtures/build_fixtures.py`. Eight fixtures are staged for incremental complexity — `plain_text`, `headings`, `lists`, `two_column`, `tables`, `complex_layout`, `cropbox_offset` (whose CropBox has a non-zero origin, pinning the region-coordinate contract), and `document_info` (which populates the PDF document information dictionary via `\pdfinfo`). The `.tex` sources are tracked; the built PDFs are gitignored build artifacts.
 
 Build them with:
 

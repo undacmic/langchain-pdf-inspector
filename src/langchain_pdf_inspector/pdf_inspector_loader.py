@@ -112,7 +112,8 @@ class PdfInspectorLoader(BasePDFLoader):
     `page_regions`/`region_delimiter`/`page_delimiter` are forwarded to
     `PdfInspectorParser`; see its `__init__` for the semantics of each option.
     Every parsed `Document` carries the base metadata (`source`, `pdf_type`,
-    `total_pages`) built by the parser.
+    `total_pages`, plus the PDF's document info fields when present) built by
+    the parser.
 
     Examples:
         Setup:
@@ -174,10 +175,16 @@ class PdfInspectorLoader(BasePDFLoader):
                 Mutually exclusive with `extract_regions`.
             extract_regions: Crop text to `page_regions` when `True`.
                 Mutually exclusive with `extract_positions`.
-            pages: Pages to restrict extraction to (0-indexed). **Required in
-                `"page"` mode** (a non-empty list; an empty list or `None`
-                raises `ValueError`). Lenient in `"single"` mode.
-            page_regions: Regions to crop when `extract_regions=True`.
+            pages: Pages to restrict extraction to, 0-indexed for every mode
+                and extraction path. Forwarded to `PdfInspectorParser`; see its
+                `__init__` for the authoritative contract (required vs. lenient
+                modes, negative-index validation, and out-of-range/duplicate
+                handling).
+            page_regions: Regions to crop when `extract_regions=True`. Each
+                entry is `(page, [[x0, y0, x1, y1], ...])`. Coordinates are in
+                PDF points with a top-left origin and `y` increasing downward,
+                relative to the visible page box (CropBox intersected with
+                MediaBox), **not** the MediaBox.
             region_delimiter: String used to join the extracted region texts.
                 Forwarded to `PdfInspectorParser`; defaults to `"\\n\\n"`.
             page_delimiter: String used to join pages together in the
@@ -196,7 +203,8 @@ class PdfInspectorLoader(BasePDFLoader):
             NotImplementedError: If `extract_images` is `True`.
             ImportError: If the `pdf_inspector` package is not installed.
             ValueError: If the parser's option validation fails, e.g.
-                `mode="page"` without a non-empty `pages` list.
+                `mode="page"` without a non-empty `pages` list or a negative
+                entry in `pages`.
         """
         if extract_images:
             raise NotImplementedError(
@@ -248,8 +256,9 @@ class PdfInspectorLoader(BasePDFLoader):
         region-cropped output, and `pages`/`page_regions` select the pages to
         process (subject to the disjoint rules enforced by `PdfInspectorParser`).
         Every `Document` carries the base detection metadata (`source`,
-        `pdf_type`, `total_pages`) built by the parser, plus the branch-specific
-        keys. All `page` metadata is 1-indexed.
+        `pdf_type`, `total_pages`, plus the PDF's document info fields when
+        present) built by the parser, plus the branch-specific keys. All `page`
+        metadata is 1-indexed.
 
         Any caller-supplied `metadata` (passed to the constructor) is merged on
         top of the parser metadata for every yielded `Document`; on a key
