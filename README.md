@@ -119,6 +119,8 @@ for doc in loader.load():
 
 Set `extract_regions=True` and pass `page_regions` to crop text to `[x0, y0, x1, y1]` rectangles. `extract_regions` requires `page_regions` and is mutually exclusive with `extract_positions`:
 
+Region coordinates are in PDF points with a **top-left origin** and `y` increasing downward, measured relative to the **visible page box** — the intersection of the page's CropBox and MediaBox. They are *not* relative to the MediaBox. The two coincide when the CropBox starts at `(0, 0)`, which is the common case; on pages with a non-zero CropBox origin, measure from the top-left of the visible (cropped) area instead.
+
 ```python
 # Single mode: one joined Document cropped to the given regions
 loader = PdfInspectorLoader(

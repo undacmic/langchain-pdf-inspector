@@ -70,6 +70,13 @@ class PdfInspectorParser(BaseBlobParser):
     selection therefore addresses the same logical pages in the positional-text
     and markdown paths. See `__init__` for the full parameter documentation.
 
+    Region coordinates (`page_regions`) are `[x0, y0, x1, y1]` rectangles in
+    PDF points with a **top-left origin** and `y` increasing downward, measured
+    relative to the **visible page box**: the intersection of the page's
+    CropBox and MediaBox. They are *not* relative to the MediaBox. The two are
+    identical when the CropBox starts at `(0, 0)`, but differ on cropped pages;
+    on those, use coordinates from the top-left of the visible (cropped) area.
+
     Examples:
         Setup:
 
@@ -154,7 +161,10 @@ class PdfInspectorParser(BaseBlobParser):
                 underlying extraction fail.
             page_regions: Per-page regions to crop, required when
                 `extract_regions=True`. Each entry is `(page, [[x0, y0, x1,
-                y1], ...])`. Lenient: silently ignored unless `extract_regions`
+                y1], ...])`. Coordinates are in PDF points with a top-left
+                origin and `y` increasing downward, relative to the visible
+                page box (CropBox intersected with MediaBox), **not** the
+                MediaBox. Lenient: silently ignored unless `extract_regions`
                 is active.
             region_delimiter: String used to join the extracted region texts
                 (both the joined single-mode regions and the page-mode

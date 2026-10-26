@@ -216,6 +216,29 @@ def test_region_extraction_crops_known_area(plain_text_pdf: Path) -> None:
 
 
 @pytest.mark.requires("pdf_inspector")
+def test_region_coordinates_are_relative_to_visible_page_box(
+    cropbox_offset_pdf: Path,
+) -> None:
+    """Region coordinates use a top-left origin relative to the visible page box.
+
+    ``cropbox_offset.pdf`` has a MediaBox of ``[0 0 612 792]`` and a CropBox
+    whose lower-left is not ``(0, 0)``, so the visible page box (CropBox
+    intersected with MediaBox) is offset from the MediaBox. The region below is
+    expressed in visible-page-box coordinates; it only contains the sentinel if
+    ``pdf-inspector`` measures ``page_regions`` from the top-left of that box
+    rather than from the MediaBox.
+    """
+    blob = _blob_from_pdf(cropbox_offset_pdf)
+    parser = PdfInspectorParser(
+        extract_regions=True,
+        page_regions=[(0, [[20.0, 20.0, 520.0, 80.0]])],
+    )
+    doc = parser.parse(blob)[0]
+
+    assert "cropboxsentinel-tango" in doc.page_content
+
+
+@pytest.mark.requires("pdf_inspector")
 def test_region_delimiter_joins_regions_in_single_mode(plain_text_pdf: Path) -> None:
     """Regions inside one page entry are joined with ``region_delimiter``."""
     blob = _blob_from_pdf(plain_text_pdf)

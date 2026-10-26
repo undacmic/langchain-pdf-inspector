@@ -186,7 +186,11 @@ class PdfInspectorLoader(BasePDFLoader):
                 markdown path emits one `Document` per occurrence in the
                 requested order. Negative indices are invalid and make the
                 underlying extraction fail.
-            page_regions: Regions to crop when `extract_regions=True`.
+            page_regions: Regions to crop when `extract_regions=True`. Each
+                entry is `(page, [[x0, y0, x1, y1], ...])`. Coordinates are in
+                PDF points with a top-left origin and `y` increasing downward,
+                relative to the visible page box (CropBox intersected with
+                MediaBox), **not** the MediaBox.
             region_delimiter: String used to join the extracted region texts.
                 Forwarded to `PdfInspectorParser`; defaults to `"\\n\\n"`.
             page_delimiter: String used to join pages together in the
