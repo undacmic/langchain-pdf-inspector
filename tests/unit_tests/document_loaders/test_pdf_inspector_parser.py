@@ -17,9 +17,12 @@ from ._markup import has_list_item, normalize_table_markup
 # Fixture facts (verified against the LaTeX sources and `detect_pdf_bytes`)
 # ---------------------------------------------------------------------------
 
-# Physical page count of every built fixture PDF. These are read from the
-# `.tex` sources (page breaks / multi-page layout) and confirmed against the
-# parser output so the "one Document per page" assertions stay truthful.
+# Physical page count of every built fixture PDF, read from the `.tex` sources
+# (explicit page breaks / multi-page layout) and confirmed against the parser
+# output so the "one Document per page" assertions stay truthful. The generic
+# single-document and page-count tests are parametrized over this mapping, so
+# every fixture (including the cross-cutting `cropbox_offset` and
+# `document_info` ones) gets the standard sanity checks.
 FIXTURE_PAGE_COUNTS: dict[str, int] = {
     "plain_text": 3,
     "headings": 1,
@@ -27,6 +30,8 @@ FIXTURE_PAGE_COUNTS: dict[str, int] = {
     "two_column": 1,
     "tables": 2,
     "complex_layout": 2,
+    "cropbox_offset": 1,
+    "document_info": 1,
 }
 
 ALL_FIXTURES: list[str] = sorted(FIXTURE_PAGE_COUNTS)
@@ -147,6 +152,11 @@ def test_markdown_preserves_lists(lists_pdf: Path) -> None:
     # any common unordered marker instead of the exact U+2022 / U+2013 glyphs.
     assert has_list_item(content, "listsentinel-quark")  # top-level bullet
     assert has_list_item(content, "listsentinel-nested")  # nested bullet
+    # A hyphen in ordinary prose is not a list marker: the marker must lead the
+    # line, so this must not be treated as a bulleted item.
+    assert not has_list_item(
+        "well-known facts about listsentinel-quark", "listsentinel-quark"
+    )
     for marker in ("1.", "2.", "3.", "(a)"):
         assert marker in content
     # All three sentinel markers survive into the markdown output.
@@ -165,7 +175,7 @@ def test_markdown_preserves_tables(tables_pdf: Path) -> None:
     content = PdfInspectorParser(output="markdown").parse(blob)[0].page_content
 
     assert "|" in content
-    assert "|tablesentinel-beta|7active|" in normalize_table_markup(content)
+    assert "|tablesentinel-beta|<empty>|7 active|" in normalize_table_markup(content)
     for sentinel in (
         "tablesentinel-alpha",
         "tablesentinel-beta",
@@ -221,21 +231,32 @@ def test_region_coordinates_are_relative_to_visible_page_box(
 ) -> None:
     """Region coordinates use a top-left origin relative to the visible page box.
 
-    ``cropbox_offset.pdf`` has a MediaBox of ``[0 0 612 792]`` and a CropBox
-    whose lower-left is not ``(0, 0)``, so the visible page box (CropBox
-    intersected with MediaBox) is offset from the MediaBox. The region below is
-    expressed in visible-page-box coordinates; it only contains the sentinel if
-    ``pdf-inspector`` measures ``page_regions`` from the top-left of that box
-    rather than from the MediaBox.
+    ``cropbox_offset.pdf`` pins its MediaBox to ``[0 0 612 792]`` and sets a
+    CropBox whose lower-left is ``(36, 54)``, so the visible page box (CropBox
+    intersected with MediaBox) is ``[36 54 576 756]``: 540 x 702 points, with
+    its top edge 36 points below the MediaBox top edge. The sentinel line sits
+    at visible ``y`` 86-102.
+
+    The first region is the tight band around that line in visible-page-box
+    coordinates. A MediaBox-relative implementation would read it 36 points too
+    high and miss the sentinel. The second region is the *same physical band*
+    expressed in MediaBox coordinates (``y + 36``); under the correct
+    visible-box interpretation it falls below the text, which is the negative
+    half of the contract.
     """
     blob = _blob_from_pdf(cropbox_offset_pdf)
-    parser = PdfInspectorParser(
-        extract_regions=True,
-        page_regions=[(0, [[20.0, 20.0, 520.0, 80.0]])],
-    )
-    doc = parser.parse(blob)[0]
 
-    assert "cropboxsentinel-tango" in doc.page_content
+    visible_doc = PdfInspectorParser(
+        extract_regions=True,
+        page_regions=[(0, [[0.0, 80.0, 540.0, 110.0]])],
+    ).parse(blob)[0]
+    assert "cropboxsentinel-tango" in visible_doc.page_content
+
+    mediabox_relative_doc = PdfInspectorParser(
+        extract_regions=True,
+        page_regions=[(0, [[0.0, 116.0, 540.0, 146.0]])],
+    ).parse(blob)[0]
+    assert "cropboxsentinel-tango" not in mediabox_relative_doc.page_content
 
 
 @pytest.mark.requires("pdf_inspector")
@@ -404,12 +425,24 @@ def test_page_mode_text_positions(plain_text_pdf: Path) -> None:
     assert "plaintextsentinel-foxtrot" in foxtrot_doc.page_content
 
 
+# Unique sentinel on each physical page of ``plain_text.pdf`` (1-indexed).
+PAGE_SENTINELS: dict[int, str] = {
+    1: "quokka",
+    2: "plaintextsentinel-foxtrot",
+    3: "plaintextsentinel-golf",
+}
+
+
 @pytest.mark.requires("pdf_inspector")
-@pytest.mark.parametrize("pages", [[0, 1, 2], [1, 2]])
+@pytest.mark.parametrize("pages", [[0, 1, 2], [1, 2, 99]])
 def test_page_mode_positions_and_markdown_select_same_pages(
     plain_text_pdf: Path, pages: list[int]
 ) -> None:
-    """The same 0-indexed ``pages`` selection means the same pages in both paths."""
+    """The same 0-indexed ``pages`` selection means the same pages in both paths.
+
+    The second case includes an out-of-range index (``99``); both paths omit
+    it, so page 100 is never emitted.
+    """
     blob = _blob_from_pdf(plain_text_pdf)
 
     positions_docs = PdfInspectorParser(
@@ -422,6 +455,17 @@ def test_page_mode_positions_and_markdown_select_same_pages(
     positions_pages = [doc.metadata["page"] for doc in positions_docs]
     markdown_pages = [doc.metadata["page"] for doc in markdown_docs]
     assert sorted(positions_pages) == sorted(markdown_pages)
+    assert all(page <= 3 for page in positions_pages)
+
+    positions_by_page = {
+        doc.metadata["page"]: doc.page_content for doc in positions_docs
+    }
+    markdown_by_page = {doc.metadata["page"]: doc.page_content for doc in markdown_docs}
+    # The same page number must carry the same page's content in both paths.
+    for page in positions_pages:
+        sentinel = PAGE_SENTINELS[page]
+        assert sentinel in positions_by_page[page]
+        assert sentinel in markdown_by_page[page]
 
 
 @pytest.mark.requires("pdf_inspector")
@@ -487,6 +531,8 @@ def test_lazy_parse_matches_parse(plain_text_pdf: Path) -> None:
         ({"output": "html"}, "output must be either"),
         ({"mode": "page"}, "pages is required when mode='page'"),
         ({"mode": "page", "pages": []}, "pages is required when mode='page'"),
+        ({"pages": [-1]}, "non-negative"),
+        ({"pages": [0, -2]}, "non-negative"),
         ({"extract_positions": True, "extract_regions": True}, "mutually exclusive"),
         ({"extract_regions": True}, "page_regions is required"),
         (

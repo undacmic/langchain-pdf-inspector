@@ -16,15 +16,33 @@ if TYPE_CHECKING:
     )
 
 
+def _document_info_metadata(result: PdfResult) -> dict[str, str]:
+    """Extract non-empty PDF document info fields using the upstream names.
+
+    Returns the `title`, `author`, `subject`, `keywords`, `creator`,
+    `producer`, `creation_date`, and `mod_date` entries that are present and
+    non-empty. Missing, `None`, and empty values are skipped rather than
+    emitted as nulls.
+    """
+    fields: dict[str, str | None] = {
+        "title": result.title,
+        "author": result.author,
+        "subject": result.subject,
+        "keywords": result.keywords,
+        "creator": result.creator,
+        "producer": result.producer,
+        "creation_date": result.creation_date,
+        "mod_date": result.mod_date,
+    }
+    return {key: value for key, value in fields.items() if value}
+
+
 def _build_base_metadata(blob: Blob) -> dict[str, Any]:
     """Build the base metadata shared by every generated `Document`.
 
     Always includes `source`, and attaches `pdf_type` and `total_pages` from
-    `detect_pdf_bytes` when detection succeeds. The PDF's own document
-    information dictionary (`title`, `author`, `subject`, `keywords`,
-    `creator`, `producer`, `creation_date`, `mod_date`) is merged in when
-    present, using the upstream field names. Missing, `None`, or empty values
-    are skipped rather than emitted as nulls.
+    `detect_pdf_bytes` when detection succeeds. When detection succeeds, the
+    PDF's own document info fields are merged in via `_document_info_metadata`.
     """
 
     metadata: dict[str, Any] = {"source": blob.source}
@@ -42,19 +60,7 @@ def _build_base_metadata(blob: Blob) -> dict[str, Any]:
     if result.page_count is not None:
         metadata["total_pages"] = result.page_count
 
-    document_info: dict[str, str | None] = {
-        "title": result.title,
-        "author": result.author,
-        "subject": result.subject,
-        "keywords": result.keywords,
-        "creator": result.creator,
-        "producer": result.producer,
-        "creation_date": result.creation_date,
-        "mod_date": result.mod_date,
-    }
-    for key, value in document_info.items():
-        if value:
-            metadata[key] = value
+    metadata.update(_document_info_metadata(result))
 
     return metadata
 
@@ -83,10 +89,11 @@ class PdfInspectorParser(BaseBlobParser):
     `extract_regions=True` requires `page_regions`. `pages` is required in
     `"page"` mode; in `"single"` mode `pages` and `page_regions` are lenient:
     when they do not apply to the chosen extraction path they are silently
-    ignored rather than raising. Inputs (`pages`/`page_regions`) are 0-indexed;
-    all output `page` metadata is 1-indexed. The same 0-indexed `pages`
-    selection therefore addresses the same logical pages in the positional-text
-    and markdown paths. See `__init__` for the full parameter documentation.
+    ignored rather than raising. Inputs (`pages`/`page_regions`) are 0-indexed
+    and negative `pages` entries raise `ValueError`; all output `page` metadata
+    is 1-indexed. The same 0-indexed `pages` selection therefore addresses the
+    same logical pages in the positional-text and markdown paths. See
+    `__init__` for the full `pages` contract.
 
     Region coordinates (`page_regions`) are `[x0, y0, x1, y1]` rectangles in
     PDF points with a **top-left origin** and `y` increasing downward, measured
@@ -169,14 +176,16 @@ class PdfInspectorParser(BaseBlobParser):
                 `ValueError`). In `"single"` mode it is lenient: `None` means
                 the whole document and the value is silently ignored when the
                 chosen extraction path does not use it (e.g. plain-text
-                extraction). Out-of-range indices are not validated: the
-                positional-text path silently omits them, while the markdown
-                path emits an empty `Document` for each one (flagged
-                `needs_ocr=True`). Duplicate indices are collapsed to one
-                `Document` per page by the positional-text path, while the
-                markdown path emits one `Document` per occurrence in the
-                requested order. Negative indices are invalid and make the
-                underlying extraction fail.
+                extraction). **Negative indices raise `ValueError`.** This is
+                the authoritative `pages` contract; the class docstring, the
+                loader, and the README summarize it rather than restating it.
+                Out-of-range indices are not validated: the positional-text
+                path silently omits them, and the markdown path skips them when
+                the detected page count is available (so no empty `Document` is
+                emitted for a nonexistent page). Duplicate indices are collapsed
+                to one `Document` per page by the positional-text path, while
+                the markdown path emits one `Document` per occurrence in the
+                requested order.
             page_regions: Per-page regions to crop, required when
                 `extract_regions=True`. Each entry is `(page, [[x0, y0, x1,
                 y1], ...])`. Coordinates are in PDF points with a top-left
@@ -197,9 +206,10 @@ class PdfInspectorParser(BaseBlobParser):
 
         Raises:
             ValueError: If `mode`/`output` are invalid, if `mode="page"` is set
-                without a non-empty `pages` list, if `extract_positions` and
-                `extract_regions` are both `True`, or if
-                `extract_regions=True` is set without `page_regions`.
+                without a non-empty `pages` list, if `pages` contains a
+                negative index, if `extract_positions` and `extract_regions`
+                are both `True`, or if `extract_regions=True` is set without
+                `page_regions`.
         """
         super().__init__()
 
@@ -209,6 +219,10 @@ class PdfInspectorParser(BaseBlobParser):
             raise ValueError("output must be either 'text' or 'markdown'")
         if mode == "page" and not pages:
             raise ValueError("pages is required when mode='page'")
+        if pages is not None and any(page < 0 for page in pages):
+            raise ValueError(
+                "pages must contain only non-negative 0-indexed page numbers"
+            )
         if extract_positions and extract_regions:
             raise ValueError(
                 "extract_positions and extract_regions are mutually exclusive; "
@@ -421,8 +435,13 @@ class PdfInspectorParser(BaseBlobParser):
                 metadata=metadata,
             )
         else:
+            total_pages: int | None = base_metadata.get("total_pages")
             for item in result.pages:
                 page_number = item.page + 1
+                # Upstream returns an empty entry for an out-of-range request;
+                # skip it so both extraction paths omit nonexistent pages.
+                if total_pages is not None and page_number > total_pages:
+                    continue
 
                 needs_ocr: bool = item.needs_ocr or (
                     page_number in result.pages_needing_ocr

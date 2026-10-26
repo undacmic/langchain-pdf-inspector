@@ -175,18 +175,11 @@ class PdfInspectorLoader(BasePDFLoader):
                 Mutually exclusive with `extract_regions`.
             extract_regions: Crop text to `page_regions` when `True`.
                 Mutually exclusive with `extract_positions`.
-            pages: Pages to restrict extraction to, **0-indexed for every
-                mode and extraction path** (e.g. `[0, 2]` selects the first and
-                third pages). **Required in `"page"` mode** (a non-empty list;
-                an empty list or `None` raises `ValueError`). Lenient in
-                `"single"` mode. Out-of-range indices are not validated: the
-                positional-text path silently omits them, while the markdown
-                path emits an empty `Document` for each one (flagged
-                `needs_ocr=True`). Duplicate indices are collapsed to one
-                `Document` per page by the positional-text path, while the
-                markdown path emits one `Document` per occurrence in the
-                requested order. Negative indices are invalid and make the
-                underlying extraction fail.
+            pages: Pages to restrict extraction to, 0-indexed for every mode
+                and extraction path. Forwarded to `PdfInspectorParser`; see its
+                `__init__` for the authoritative contract (required vs. lenient
+                modes, negative-index validation, and out-of-range/duplicate
+                handling).
             page_regions: Regions to crop when `extract_regions=True`. Each
                 entry is `(page, [[x0, y0, x1, y1], ...])`. Coordinates are in
                 PDF points with a top-left origin and `y` increasing downward,
@@ -210,7 +203,8 @@ class PdfInspectorLoader(BasePDFLoader):
             NotImplementedError: If `extract_images` is `True`.
             ImportError: If the `pdf_inspector` package is not installed.
             ValueError: If the parser's option validation fails, e.g.
-                `mode="page"` without a non-empty `pages` list.
+                `mode="page"` without a non-empty `pages` list or a negative
+                entry in `pages`.
         """
         if extract_images:
             raise NotImplementedError(
