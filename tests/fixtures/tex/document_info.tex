@@ -1,0 +1,28 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+% Populate the PDF document information dictionary so tests can assert that
+% `pdf-inspector`'s document info fields reach `Document.metadata`. Values are
+% deliberately distinctive and fixed (no timestamps) for stable assertions.
+\pdfinfo{
+  /Title (Document Info Fixture)
+  /Author (Ada Lovelace)
+  /Subject (Metadata extraction)
+  /Keywords (alpha, beta, gamma)
+  /Creator (pdfinfo-probe)
+  /Producer (pdfinfo-probe producer)
+  /CreationDate (D:20240115103000+01'00')
+  /ModDate (D:20240220120000+01'00')
+}
+
+\begin{document}
+
+This fixture exists to carry a PDF document information dictionary. Its body
+text only needs to be extractable: the interesting content lives in the
+\verb|/Title|, \verb|/Author|, \verb|/Subject|, \verb|/Keywords|,
+\verb|/Creator|, \verb|/Producer|, \verb|/CreationDate| and \verb|/ModDate|
+entries above, which automated tests assert against the parsed document's
+metadata.
+
+\end{document}

@@ -112,7 +112,8 @@ class PdfInspectorLoader(BasePDFLoader):
     `page_regions`/`region_delimiter`/`page_delimiter` are forwarded to
     `PdfInspectorParser`; see its `__init__` for the semantics of each option.
     Every parsed `Document` carries the base metadata (`source`, `pdf_type`,
-    `total_pages`) built by the parser.
+    `total_pages`, plus the PDF's document info fields when present) built by
+    the parser.
 
     Examples:
         Setup:
@@ -248,8 +249,9 @@ class PdfInspectorLoader(BasePDFLoader):
         region-cropped output, and `pages`/`page_regions` select the pages to
         process (subject to the disjoint rules enforced by `PdfInspectorParser`).
         Every `Document` carries the base detection metadata (`source`,
-        `pdf_type`, `total_pages`) built by the parser, plus the branch-specific
-        keys. All `page` metadata is 1-indexed.
+        `pdf_type`, `total_pages`, plus the PDF's document info fields when
+        present) built by the parser, plus the branch-specific keys. All `page`
+        metadata is 1-indexed.
 
         Any caller-supplied `metadata` (passed to the constructor) is merged on
         top of the parser metadata for every yielded `Document`; on a key

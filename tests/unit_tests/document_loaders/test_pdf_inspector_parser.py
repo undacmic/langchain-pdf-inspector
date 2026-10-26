@@ -466,6 +466,41 @@ def test_invalid_arguments_raise_value_error(
 
 
 # ---------------------------------------------------------------------------
+# Document info metadata
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requires("pdf_inspector")
+def test_document_info_metadata_is_surfaced(
+    document_info_pdf: Path, plain_text_pdf: Path
+) -> None:
+    """PDF document info fields are merged into metadata, and absent ones omitted."""
+    metadata = PdfInspectorParser().parse(_blob_from_pdf(document_info_pdf))[0].metadata
+
+    expected: dict[str, str] = {
+        "title": "Document Info Fixture",
+        "author": "Ada Lovelace",
+        "subject": "Metadata extraction",
+        "keywords": "alpha, beta, gamma",
+        "creator": "pdfinfo-probe",
+        "producer": "pdfinfo-probe producer",
+        "creation_date": "D:20240115103000+01'00'",
+        "mod_date": "D:20240220120000+01'00'",
+    }
+    for key, value in expected.items():
+        assert metadata[key] == value
+        assert isinstance(metadata[key], str)
+
+    # A PDF without those entries omits them instead of emitting None. (The
+    # plain-text fixture still carries pdfTeX's own creator/producer/dates.)
+    plain_metadata = (
+        PdfInspectorParser().parse(_blob_from_pdf(plain_text_pdf))[0].metadata
+    )
+    for key in ("title", "author", "subject", "keywords"):
+        assert key not in plain_metadata
+
+
+# ---------------------------------------------------------------------------
 # Two-column fixture sanity
 # ---------------------------------------------------------------------------
 
