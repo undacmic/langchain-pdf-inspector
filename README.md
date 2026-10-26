@@ -6,7 +6,7 @@ A LangChain `DocumentLoader` integration that wraps the Rust-backed [`pdf-inspec
 [![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)](LICENSE)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![LangChain Core](https://img.shields.io/badge/langchain--core-1.5+-blue.svg)](https://python.langchain.com/docs/introduction/)
-[![pdf-inspector](https://img.shields.io/badge/pdf--inspector-0.2.6+-blue.svg)](https://pypi.org/project/pdf-inspector/)
+[![pdf-inspector](https://img.shields.io/badge/pdf--inspector-1.25.2+-blue.svg)](https://pypi.org/project/pdf-inspector/)
 [![PyPI](https://img.shields.io/pypi/v/langchain-pdf-inspector.svg)](https://pypi.org/project/langchain-pdf-inspector/)
 
 ## Introduction
@@ -23,8 +23,8 @@ A LangChain `DocumentLoader` integration that wraps the Rust-backed [`pdf-inspec
 ## Requirements
 
 - Python 3.12 or higher
-- langchain-core 1.5.3 or higher
-- pdf-inspector 0.2.6 or higher
+- langchain-core 1.5.3 or higher (below 2.0)
+- pdf-inspector 1.25.2 or higher (below 2.0)
 
 ## Installation
 
@@ -36,7 +36,7 @@ pip install langchain-pdf-inspector
 uv add langchain-pdf-inspector
 ```
 
-Installing `langchain-pdf-inspector` also installs its pinned runtime dependencies, `langchain-core` and `pdf-inspector`. `pdf-inspector` is a required dependency; if it is missing, constructing the loader or parser raises a friendly `ImportError` telling you to run `pip install pdf-inspector`.
+Installing `langchain-pdf-inspector` also installs its required runtime dependencies, `langchain-core` and `pdf-inspector`. `pdf-inspector` is a required dependency; if it is missing, constructing the loader or parser raises a friendly `ImportError` telling you to run `pip install pdf-inspector`.
 
 To install from source instead, clone the repository and run `pip install .` (or `uv add .`) from the repo root.
 

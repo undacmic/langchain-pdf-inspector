@@ -11,6 +11,8 @@ from langchain_core.documents.base import Blob
 
 from langchain_pdf_inspector import PdfInspectorParser
 
+from ._markup import has_list_item, normalize_table_markup
+
 # ---------------------------------------------------------------------------
 # Fixture facts (verified against the LaTeX sources and `detect_pdf_bytes`)
 # ---------------------------------------------------------------------------
@@ -141,10 +143,10 @@ def test_markdown_preserves_lists(lists_pdf: Path) -> None:
     blob = _blob_from_pdf(lists_pdf)
     content = PdfInspectorParser(output="markdown").parse(blob)[0].page_content
 
-    # `pdf-inspector` renders bullets with the Unicode bullet / en-dash glyphs
-    # (not ASCII '-'/'*'), which is what the list fixture actually produces.
-    assert "•" in content  # top-level bullet marker
-    assert "–" in content  # nested bullet marker
+    # Bullet glyphs are renderer-dependent, so assert list structure through
+    # any common unordered marker instead of the exact U+2022 / U+2013 glyphs.
+    assert has_list_item(content, "listsentinel-quark")  # top-level bullet
+    assert has_list_item(content, "listsentinel-nested")  # nested bullet
     for marker in ("1.", "2.", "3.", "(a)"):
         assert marker in content
     # All three sentinel markers survive into the markdown output.
@@ -163,7 +165,7 @@ def test_markdown_preserves_tables(tables_pdf: Path) -> None:
     content = PdfInspectorParser(output="markdown").parse(blob)[0].page_content
 
     assert "|" in content
-    assert "|tablesentinel-beta|7 active|" in content
+    assert "|tablesentinel-beta|7active|" in normalize_table_markup(content)
     for sentinel in (
         "tablesentinel-alpha",
         "tablesentinel-beta",
@@ -180,7 +182,7 @@ def test_markdown_preserves_table_in_complex_layout(complex_layout_pdf: Path) ->
     content = PdfInspectorParser(output="markdown").parse(blob)[0].page_content
 
     assert "|" in content
-    assert "|layoutsentinel-table|128|active|" in content
+    assert "|layoutsentinel-table|128|active|" in normalize_table_markup(content)
     for sentinel in (
         "layoutsentinel-intro",
         "layoutsentinel-wrap",
@@ -363,11 +365,11 @@ def test_page_mode_markdown_layout_flags_complex(complex_layout_pdf: Path) -> No
 @pytest.mark.requires("pdf_inspector")
 def test_page_mode_text_positions(plain_text_pdf: Path) -> None:
     """Page-mode positional text yields one ``Document`` per extracted page."""
-    # ``pdf-inspector`` 0.2.6 filters pages using *1-based* page numbers (a
-    # quirk of this library version), so the documented 0-indexed
-    # ``pages=[0, 1, 2]`` resolves to physical pages 1 and 2 of the
-    # three-page fixture. We assert the actual behavior so the test stays
-    # truthful about what the library returns.
+    # ``pdf-inspector`` (verified on 0.2.6 and 1.25.2) filters pages using
+    # *1-based* page numbers (a quirk of this library version), so the
+    # documented 0-indexed ``pages=[0, 1, 2]`` resolves to physical pages 1
+    # and 2 of the three-page fixture. We assert the actual behavior so the
+    # test stays truthful about what the library returns.
     blob = _blob_from_pdf(plain_text_pdf)
     docs = PdfInspectorParser(
         mode="page", output="text", extract_positions=True, pages=[0, 1, 2]
