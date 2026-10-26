@@ -26,6 +26,8 @@ FIXTURE_NAMES = [
     "two_column_pdf",
     "tables_pdf",
     "complex_layout_pdf",
+    "tagged_structure_pdf",
+    "rotated_text_pdf",
 ]
 
 # Multi-page fixtures with the 0-indexed page lists used in ``mode="page"``.

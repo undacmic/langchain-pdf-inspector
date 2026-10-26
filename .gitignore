@@ -48,15 +48,14 @@ env/
 Icon?
 
 # ---------------------------------------------------------------------------
-# LaTeX-generated PDF test fixtures (build artifacts)
+# Test fixtures
 #
-# The PDFs under tests/fixtures/ are generated from the tracked .tex sources
-# in tests/fixtures/tex/ by `tests/fixtures/build_fixtures.py`. They are
-# reproducible build artifacts and are NOT tracked.
-#
-# The .tex sources themselves ARE tracked — never ignore them.
+# The PDFs under tests/fixtures/ ARE tracked. They are checked in so tests and
+# CI never need a TeX installation and never skip missing integration coverage.
+# Regenerate them from the tracked .tex sources/assets with
+# `uv run python tests/fixtures/build_fixtures.py`; the builder also writes the
+# small deterministic tagged/rotated PDFs. Do not ignore tests/fixtures/*.pdf.
 # ---------------------------------------------------------------------------
-tests/fixtures/*.pdf
 
 # LaTeX auxiliary files produced during compilation. The build script cleans
 # these up, but ignore them defensively anywhere they might appear.

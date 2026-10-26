@@ -32,6 +32,8 @@ FIXTURE_PAGE_COUNTS: dict[str, int] = {
     "complex_layout": 2,
     "cropbox_offset": 1,
     "document_info": 1,
+    "tagged_structure": 2,
+    "rotated_text": 1,
 }
 
 ALL_FIXTURES: list[str] = sorted(FIXTURE_PAGE_COUNTS)

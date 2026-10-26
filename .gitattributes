@@ -1,0 +1,2 @@
+# PDF fixtures contain binary data and fixed-width cross-reference entries.
+tests/fixtures/*.pdf binary

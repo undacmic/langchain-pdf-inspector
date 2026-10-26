@@ -37,23 +37,27 @@ jobs:
       - name: Type-check (mypy)
         run: uv run mypy src
 
-      - name: Install TeX Live (for PDF fixtures)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            texlive-latex-base \
-            texlive-latex-recommended \
-            texlive-latex-extra \
-            texlive-fonts-recommended \
-            cm-super
-          # cm-super provides the Type 1 EC-font outlines (ecrm1000.pfb, etc.)
-          # that \usepackage[T1]{fontenc} needs. Without it, pdflatex falls back
-          # to Type 3 bitmap fonts with no ToUnicode CMap, and the fixture PDFs
-          # yield mojibake/empty text on Linux. The package's postinst runs
-          # `updmap-sys`, which enables the cm-super map automatically.
+      - name: Verify checked-in PDF fixtures (no TeX required)
+        run: uv run python tests/fixtures/build_fixtures.py --check
 
-      - name: Build PDF test fixtures
-        run: uv run python tests/fixtures/build_fixtures.py
-
-      - name: Run tests
+      - name: Run tests (real fixtures, no missing-fixture skips)
         run: uv run pytest
+
+  build:
+    name: Build & check distributions (Python 3.12)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Install uv and Python 3.12
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist & wheel
+        run: uv build
+
+      - name: Check distribution contents
+        run: python3 tests/check_distribution.py
