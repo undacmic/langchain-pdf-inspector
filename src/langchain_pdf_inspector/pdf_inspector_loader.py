@@ -174,9 +174,18 @@ class PdfInspectorLoader(BasePDFLoader):
                 Mutually exclusive with `extract_regions`.
             extract_regions: Crop text to `page_regions` when `True`.
                 Mutually exclusive with `extract_positions`.
-            pages: Pages to restrict extraction to (0-indexed). **Required in
-                `"page"` mode** (a non-empty list; an empty list or `None`
-                raises `ValueError`). Lenient in `"single"` mode.
+            pages: Pages to restrict extraction to, **0-indexed for every
+                mode and extraction path** (e.g. `[0, 2]` selects the first and
+                third pages). **Required in `"page"` mode** (a non-empty list;
+                an empty list or `None` raises `ValueError`). Lenient in
+                `"single"` mode. Out-of-range indices are not validated: the
+                positional-text path silently omits them, while the markdown
+                path emits an empty `Document` for each one (flagged
+                `needs_ocr=True`). Duplicate indices are collapsed to one
+                `Document` per page by the positional-text path, while the
+                markdown path emits one `Document` per occurrence in the
+                requested order. Negative indices are invalid and make the
+                underlying extraction fail.
             page_regions: Regions to crop when `extract_regions=True`.
             region_delimiter: String used to join the extracted region texts.
                 Forwarded to `PdfInspectorParser`; defaults to `"\\n\\n"`.
