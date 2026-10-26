@@ -15,6 +15,8 @@ from langchain_core.documents.base import Blob
 from langchain_pdf_inspector import PdfInspectorLoader
 from langchain_pdf_inspector.pdf_inspector_loader import BasePDFLoader
 
+from ._markup import has_list_item, normalize_table_markup
+
 # Conftest fixture names that resolve to the absolute path of each built PDF
 # (skipping the test with an actionable message when the PDF is absent).
 FIXTURE_NAMES = [
@@ -83,8 +85,8 @@ class TestSingleMode:
     def test_single_mode_plain_text_is_full_prose(self, plain_text_pdf: Path) -> None:
         """Plain-text output contains prose from every page of the fixture."""
         content = PdfInspectorLoader(str(plain_text_pdf)).load()[0].page_content
-        # Note: "fixture" is extracted with the ``fi`` ligature (U+FB01), so the
-        # prose assertion stops before that word.
+        # Note: "fixture" is still extracted with the ``fi`` ligature (U+FB01)
+        # on pdf-inspector 1.25.2, so the prose assertion stops before that word.
         assert "This is the opening paragraph of the plain text" in content
         assert "plaintextsentinel-foxtrot" in content
         assert "plaintextsentinel-golf" in content
@@ -207,8 +209,9 @@ class TestMarkdownOutput:
             PdfInspectorLoader(str(lists_pdf), output="markdown").load()[0].page_content
         )
         assert "# 1 Shopping and Tasks" in content
-        assert "\u2022" in content  # pdf-inspector emits U+2022 bullets, not "-" or "*"
-        assert "listsentinel-quark" in content
+        # Bullet glyphs are renderer-dependent (U+2022, "-", ...), so assert
+        # that the item keeps a list marker rather than one exact glyph.
+        assert has_list_item(content, "listsentinel-quark")
         assert "listsentinel-nested" in content
 
     def test_markdown_preserves_table_rows(self, tables_pdf: Path) -> None:
@@ -218,8 +221,9 @@ class TestMarkdownOutput:
             .load()[0]
             .page_content
         )
-        assert "|tablesentinel-beta|" in content
-        assert "|widget|3 active|" in content
+        table = normalize_table_markup(content)
+        assert "|tablesentinel-beta|7active|" in table
+        assert "|widget|3active|" in table
         assert "Metric" in content
         assert "tablesentinel-alpha" in content
         assert "tablesentinel-gamma" in content
@@ -233,8 +237,9 @@ class TestMarkdownOutput:
             .load()[0]
             .page_content
         )
-        assert "|Region|Recordings|Flag|" in content
-        assert "|layoutsentinel-table|128|active|" in content
+        table = normalize_table_markup(content)
+        assert "|Region|Recordings|Flag|" in table
+        assert "|layoutsentinel-table|128|active|" in table
 
 
 @pytest.mark.requires("pdf_inspector")

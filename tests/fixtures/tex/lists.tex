@@ -2,11 +2,11 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \begin{document}
-% The top-level itemize label is `\textbullet`. pdf-inspector 0.2.6 keeps the
-% bullet as U+2022 ("•") only when it merges into the following text run;
-% with the default \labelsep the bullet is emitted as its own leading run on
-% some TeX Live versions (2023/Debian), which pdf-inspector then normalizes to
-% "-" and the U+2022 assertion fails. Zeroing \labelsep forces the bullet to
+% The top-level itemize label is `\textbullet`. pdf-inspector (verified on
+% 0.2.6 and 1.25.2) keeps the bullet as U+2022 ("•") only when it merges into
+% the following text run; with the default \labelsep the bullet is emitted as
+% its own leading run on some TeX Live versions (2023/Debian), which
+% pdf-inspector then normalizes to "-". Zeroing \labelsep forces the bullet to
 % merge with the item text, so the extracted marker is "•" consistently on CI
 % (TeX Live 2023) and macOS (TeX Live 2026).
 \setlength{\labelsep}{0pt}
