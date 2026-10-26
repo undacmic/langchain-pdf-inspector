@@ -20,7 +20,11 @@ def _build_base_metadata(blob: Blob) -> dict[str, Any]:
     """Build the base metadata shared by every generated `Document`.
 
     Always includes `source`, and attaches `pdf_type` and `total_pages` from
-    `detect_pdf_bytes` when detection succeeds. `None` values are skipped.
+    `detect_pdf_bytes` when detection succeeds. The PDF's own document
+    information dictionary (`title`, `author`, `subject`, `keywords`,
+    `creator`, `producer`, `creation_date`, `mod_date`) is merged in when
+    present, using the upstream field names. Missing, `None`, or empty values
+    are skipped rather than emitted as nulls.
     """
 
     metadata: dict[str, Any] = {"source": blob.source}
@@ -37,6 +41,20 @@ def _build_base_metadata(blob: Blob) -> dict[str, Any]:
         metadata["pdf_type"] = result.pdf_type
     if result.page_count is not None:
         metadata["total_pages"] = result.page_count
+
+    document_info: dict[str, str | None] = {
+        "title": result.title,
+        "author": result.author,
+        "subject": result.subject,
+        "keywords": result.keywords,
+        "creator": result.creator,
+        "producer": result.producer,
+        "creation_date": result.creation_date,
+        "mod_date": result.mod_date,
+    }
+    for key, value in document_info.items():
+        if value:
+            metadata[key] = value
 
     return metadata
 
@@ -227,7 +245,8 @@ class PdfInspectorParser(BaseBlobParser):
         `output`/`extract_positions`/`extract_regions`: plain text,
         positional text, region-cropped text or markdown (see `__init__`).
         Every yielded `Document` carries the base detection metadata (`source`,
-        `pdf_type`, `total_pages`) built by `_build_base_metadata`.
+        `pdf_type`, `total_pages`, plus any PDF document info fields such as
+        `title` and `author`) built by `_build_base_metadata`.
 
         Yields:
             `Document` objects with the extracted content and metadata.

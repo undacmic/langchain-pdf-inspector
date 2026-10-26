@@ -79,7 +79,7 @@ for doc in loader.lazy_load():
     print(doc.metadata["page"], doc.page_content[:80])
 ```
 
-Every `Document` carries `source` and a 1-indexed `page`; `pdf_type` and `total_pages` are attached whenever page detection succeeds. Caller-supplied metadata is merged on top of these keys, and wins on conflicts.
+Every `Document` carries `source` and a 1-indexed `page`; `pdf_type` and `total_pages` are attached whenever page detection succeeds. The PDF's own document information is surfaced too, under the `pdf-inspector` field names: `title`, `author`, `subject`, `keywords`, `creator`, `producer`, `creation_date`, and `mod_date` (all strings). Fields the PDF does not provide — or provides as empty — are omitted rather than emitted as `null`. Caller-supplied metadata is merged on top of these keys, and wins on conflicts.
 
 ### One document per page
 
@@ -189,7 +189,7 @@ The repo ships a [dev container](.devcontainer/devcontainer.json) (VS Code, Pyth
 
 ## Creating Test Documents
 
-Test fixtures are PDFs compiled from LaTeX sources under `tests/fixtures/tex/` by `tests/fixtures/build_fixtures.py`. Six fixtures are staged for incremental complexity — `plain_text`, `headings`, `lists`, `two_column`, `tables`, and `complex_layout`. The `.tex` sources are tracked; the built PDFs are gitignored build artifacts.
+Test fixtures are PDFs compiled from LaTeX sources under `tests/fixtures/tex/` by `tests/fixtures/build_fixtures.py`. Eight fixtures are staged for incremental complexity — `plain_text`, `headings`, `lists`, `two_column`, `tables`, `complex_layout`, `cropbox_offset` (whose CropBox has a non-zero origin, pinning the region-coordinate contract), and `document_info` (which populates the PDF document information dictionary via `\pdfinfo`). The `.tex` sources are tracked; the built PDFs are gitignored build artifacts.
 
 Build them with:
 
