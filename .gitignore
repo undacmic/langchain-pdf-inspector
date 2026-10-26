@@ -35,6 +35,7 @@ env/
 # IDE / tooling
 # ---------------------------------------------------------------------------
 .idea/
+.opencode/
 .playwright-mcp/
 .vscode/
 .agents/
