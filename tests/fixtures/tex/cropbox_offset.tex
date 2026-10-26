@@ -1,0 +1,17 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+% Region-coordinate contract fixture: the visible page box is not the MediaBox.
+%
+% The default MediaBox is [0 0 612 792] (US Letter, points). This sets a
+% CropBox whose lower-left corner is (36, 54) -- deliberately not (0, 0) -- so
+% the visible page box (CropBox intersected with MediaBox) is
+% [36 54 576 756]. Region coordinates must be measured from the top-left of
+% that visible box; measuring from the MediaBox instead shifts every crop and
+% drops the sentinel line below.
+\pdfpageattr{/CropBox [36 54 576 756]}
+\begin{document}
+
+\noindent The cropboxsentinel-tango marker sits on the first line of this page.
+
+\end{document}

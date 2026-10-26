@@ -13,6 +13,10 @@ Design note: the fixtures are intentionally staged for incremental complexity:
 - Stage 2 (tables): ``tables``.
 - Stage 3 (image / complex layout): ``complex_layout``, which embeds
   ``sample.png``.
+- Cross-cutting: ``cropbox_offset``, whose CropBox has a non-zero lower-left
+  origin. It pins the region-coordinate contract: region boxes are measured
+  from the top-left of the visible page box (CropBox intersected with
+  MediaBox), not the MediaBox.
 
 Later stages slot in as an additional ``.tex`` source + ``SOURCES`` entry with
 no change to the engine/cleanup logic below.
@@ -37,7 +41,9 @@ FIXTURES_DIR = Path(__file__).resolve().parent
 TEX_DIR = FIXTURES_DIR / "tex"
 
 # Stage 1 text-only, Stage 2 tables, and Stage 3 complex-layout+image fixtures.
-# Add new stems here as later stages land.
+# ``cropbox_offset`` is the region-coordinate contract fixture: its CropBox has
+# a non-zero lower-left origin, so the visible page box differs from the
+# MediaBox. Add new stems here as later stages land.
 SOURCES = [
     "plain_text",
     "headings",
@@ -45,6 +51,7 @@ SOURCES = [
     "two_column",
     "tables",
     "complex_layout",
+    "cropbox_offset",
 ]
 
 # Engine. All fixtures are pdflatex-compatible, so we fix the engine to
