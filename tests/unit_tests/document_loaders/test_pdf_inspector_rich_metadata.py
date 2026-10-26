@@ -11,6 +11,7 @@ import pytest
 from langchain_core.documents.base import Blob
 
 from langchain_pdf_inspector import PdfInspectorParser
+from tests.fixtures.build_fixtures import _build_pdf, _pdf_stream
 
 TEXT_ITEM_FIELDS = {
     "text",
@@ -53,6 +54,60 @@ def _pdf_object_bodies(pdf_path: Path) -> dict[int, bytes]:
             rb"(?m)^(\d+) 0 obj\n(.*?)\nendobj\n", data, flags=re.DOTALL
         )
     }
+
+
+def _empty_link_pdf(*, empty_only_second_page: bool = False) -> bytes:
+    """Build a valid PDF with text and an empty-URI link annotation.
+
+    Released ``pdf-inspector`` reports a link annotation with an empty URI as a
+    positioned ``item_type="link:"`` record whose ``text`` is empty. With
+    ``empty_only_second_page=True`` the second page has no content stream at
+    all, so it must still be omitted from page-mode documents.
+    """
+    content = b"BT /F1 12 Tf 72 700 Td (Ordinary text) Tj ET\n"
+    first_annotation = (
+        b"<< /Type /Annot /Rect [72 500 200 520] /P 3 0 R "
+        b"/Subtype /Link /A << /S /URI /URI () >> >>"
+    )
+    font = (
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
+        b"/Encoding /WinAnsiEncoding >>"
+    )
+    if not empty_only_second_page:
+        objects = [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            (
+                b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+                b"/Resources 4 0 R /Contents 5 0 R /Annots [7 0 R] >>"
+            ),
+            b"<< /Font << /F1 6 0 R >> >>",
+            _pdf_stream(content),
+            font,
+            first_annotation,
+        ]
+    else:
+        objects = [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
+            (
+                b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+                b"/Resources 5 0 R /Contents 6 0 R /Annots [8 0 R] >>"
+            ),
+            (
+                b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+                b"/Resources 5 0 R /Annots [9 0 R] >>"
+            ),
+            b"<< /Font << /F1 7 0 R >> >>",
+            _pdf_stream(content),
+            font,
+            first_annotation,
+            (
+                b"<< /Type /Annot /Rect [100 400 250 420] /P 4 0 R "
+                b"/Subtype /Link /A << /S /URI /URI () >> >>"
+            ),
+        ]
+    return _build_pdf(objects)
 
 
 @pytest.mark.requires("pdf_inspector")
@@ -119,6 +174,88 @@ def test_position_metadata_page_mode_is_scoped_to_page(
     assert positions["items"]
     assert {item["page"] for item in positions["items"]} == {2}
     assert "plaintextsentinel-foxtrot" in docs[0].page_content
+
+
+@pytest.mark.requires("pdf_inspector")
+@pytest.mark.parametrize(
+    ("mode", "pages"),
+    [("single", None), ("page", [0])],
+)
+def test_position_metadata_retains_empty_nontext_records(
+    mode: str, pages: list[int] | None
+) -> None:
+    """Empty upstream records keep their type and geometry in ``positions``."""
+    blob = Blob(data=_empty_link_pdf())
+    plain = PdfInspectorParser(mode=mode, pages=pages, extract_positions=True).parse(
+        blob
+    )
+    enriched = PdfInspectorParser(
+        mode=mode,
+        pages=pages,
+        extract_positions=True,
+        include_position_metadata=True,
+    ).parse(blob)
+
+    assert len(enriched) == len(plain) == 1
+    assert enriched[0].page_content == plain[0].page_content == "Ordinary text"
+    items = enriched[0].metadata["positions"]["items"]
+    assert [item["text"] for item in items] == ["Ordinary text", ""]
+    link = items[-1]
+    assert link["item_type"] == "link:"
+    assert (link["page"], link["x"], link["y"], link["width"], link["height"]) == (
+        1,
+        72.0,
+        500.0,
+        128.0,
+        20.0,
+    )
+    assert set(link) == TEXT_ITEM_FIELDS
+    json.loads(json.dumps(enriched[0].metadata))
+
+
+@pytest.mark.requires("pdf_inspector")
+def test_position_metadata_omits_empty_only_pages_and_scopes_records() -> None:
+    """Empty-only pages emit no document, while emitted/scoped records are kept."""
+    blob = Blob(data=_empty_link_pdf(empty_only_second_page=True))
+    plain = PdfInspectorParser(mode="page", pages=[0, 1], extract_positions=True).parse(
+        blob
+    )
+    assert [doc.metadata["page"] for doc in plain] == [1]
+    assert plain[0].page_content == "Ordinary text"
+
+    page_docs = PdfInspectorParser(
+        mode="page",
+        pages=[0, 1],
+        extract_positions=True,
+        include_position_metadata=True,
+    ).parse(blob)
+    assert [doc.metadata["page"] for doc in page_docs] == [1]
+    assert page_docs[0].page_content == plain[0].page_content
+    assert [
+        (item["text"], item["item_type"], item["page"])
+        for item in page_docs[0].metadata["positions"]["items"]
+    ] == [("Ordinary text", "text", 1), ("", "link:", 1)]
+
+    # Requesting only the empty-only page still emits no page document.
+    assert (
+        PdfInspectorParser(
+            mode="page",
+            pages=[1],
+            extract_positions=True,
+            include_position_metadata=True,
+        ).parse(blob)
+        == []
+    )
+
+    single_doc = PdfInspectorParser(
+        extract_positions=True, include_position_metadata=True
+    ).parse(blob)[0]
+    assert single_doc.page_content == "Ordinary text"
+    assert [
+        (item["text"], item["item_type"], item["page"])
+        for item in single_doc.metadata["positions"]["items"]
+    ] == [("Ordinary text", "text", 1), ("", "link:", 1), ("", "link:", 2)]
+    json.loads(json.dumps(single_doc.metadata))
 
 
 @pytest.mark.requires("pdf_inspector")

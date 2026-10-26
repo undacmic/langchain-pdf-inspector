@@ -883,7 +883,12 @@ class PdfInspectorParser(BaseBlobParser):
         base_metadata: dict[str, Any],
         structure_elements: list[dict[str, Any]] | None,
     ) -> Iterator[Document]:
-        """Extract positional text, yielding one joined `Document` in single mode or one per page."""
+        """Extract positional text, yielding one joined `Document` in single mode or one per page.
+
+        Content keeps only non-empty text and skips pages without any. Opt-in
+        ``positions`` metadata serializes every selected upstream item,
+        including empty non-text records.
+        """
         from pdf_inspector import extract_text_with_positions_bytes
 
         data: bytes = blob.as_bytes()
@@ -931,7 +936,9 @@ class PdfInspectorParser(BaseBlobParser):
                 ) from e
 
         page_items: dict[int, list[TextItem]] = {}
+        page_records: dict[int, list[TextItem]] = {}
         for item in result:
+            page_records.setdefault(item.page, []).append(item)
             if not item.text:
                 continue
             page_items.setdefault(item.page, []).append(item)
@@ -939,10 +946,9 @@ class PdfInspectorParser(BaseBlobParser):
         metadata: dict[str, Any] = dict(base_metadata)
         if self.mode == "single":
             metadata["page"] = 1
-            content_items = [item for item in result if item.text]
             self._add_structure_metadata(metadata, structure_elements)
             if self.include_position_metadata:
-                self._add_position_metadata(metadata, content_items, rotations)
+                self._add_position_metadata(metadata, result, rotations)
 
             yield Document(
                 page_content=self.page_delimiter.join(
@@ -964,7 +970,7 @@ class PdfInspectorParser(BaseBlobParser):
                 if self.include_position_metadata:
                     self._add_position_metadata(
                         page_metadata,
-                        text_items,
+                        page_records[page],
                         [rotation for rotation in rotations if rotation.page == page],
                     )
 
