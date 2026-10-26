@@ -3,7 +3,7 @@
 A LangChain `DocumentLoader` integration that wraps the Rust-backed [`pdf-inspector`](https://pypi.org/project/pdf-inspector/) library to load PDFs as plain text, markdown, positional text, or region-cropped text. It is designed as a `langchain_community`-style document loader integration.
 
 [![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](LICENSE)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![LangChain Core](https://img.shields.io/badge/langchain--core-1.5+-blue.svg)](https://python.langchain.com/docs/introduction/)
 [![pdf-inspector](https://img.shields.io/badge/pdf--inspector-1.25.2+-blue.svg)](https://pypi.org/project/pdf-inspector/)
@@ -18,7 +18,7 @@ A LangChain `DocumentLoader` integration that wraps the Rust-backed [`pdf-inspec
 `langchain-pdf-inspector` is built on two small classes. `PdfInspectorParser` (a `BaseBlobParser`) parses a single `Blob` into `Document`s across four extraction paths — plain text, markdown (headings, lists, and tables preserved), positional text (text items with bounding boxes), and region-cropped text (cropped to `[x0, y0, x1, y1]` rectangles) — each in one of two modes: `mode="single"` (one `Document` for the whole PDF, the default) or `mode="page"` (one `Document` per page). `PdfInspectorLoader` (a `BasePDFLoader`) wraps the parser, resolves local, web (HTTP/HTTPS), and S3 paths, downloads remote files to a temporary file, and merges caller-supplied metadata on top of every `Document`. Because the heavy lifting is done by the Rust-backed `pdf-inspector` package, extraction is fast and accurate for both text-based and scanned PDFs.
 
 > [!NOTE]
-> `langchain-pdf-inspector` is a standalone package (version `0.1.1`) published on [PyPI](https://pypi.org/project/langchain-pdf-inspector/). It imports from its own `langchain_pdf_inspector` namespace, so use `from langchain_pdf_inspector import PdfInspectorLoader` rather than a `langchain_community` import.
+> `langchain-pdf-inspector` is a standalone package (version `0.2.0`) published on [PyPI](https://pypi.org/project/langchain-pdf-inspector/). It imports from its own `langchain_pdf_inspector` namespace, so use `from langchain_pdf_inspector import PdfInspectorLoader` rather than a `langchain_community` import.
 
 ## Requirements
 
