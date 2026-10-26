@@ -83,7 +83,7 @@ Every `Document` carries `source` and a 1-indexed `page`; `pdf_type` and `total_
 
 ### One document per page
 
-`mode="page"` splits the PDF into one `Document` per page and requires `pages`, a non-empty list of 0-indexed pages. In page mode the content branches on `output`: `output="markdown"` yields per-page markdown with layout flags (`needs_ocr`, `has_tables`, `has_multicolumn_layout`); `output="text"` yields per-page positional or region-cropped text and requires `extract_positions` or `extract_regions`:
+`mode="page"` splits the PDF into one `Document` per page and requires `pages`, a non-empty list of 0-indexed pages. `pages` is 0-indexed for every mode and extraction path, so the same selection returns the same logical pages from positional text and markdown. Out-of-range indices are not validated: positional text silently omits them, while markdown returns an empty `Document` for each one (flagged `needs_ocr=True`). Duplicate indices yield one `Document` per page from positional text, but one `Document` per occurrence (in the requested order) from markdown. In page mode the content branches on `output`: `output="markdown"` yields per-page markdown with layout flags (`needs_ocr`, `has_tables`, `has_multicolumn_layout`); `output="text"` yields per-page positional or region-cropped text and requires `extract_positions` or `extract_regions`:
 
 ```python
 loader = PdfInspectorLoader(

@@ -364,24 +364,41 @@ def test_page_mode_markdown_layout_flags_complex(complex_layout_pdf: Path) -> No
 
 @pytest.mark.requires("pdf_inspector")
 def test_page_mode_text_positions(plain_text_pdf: Path) -> None:
-    """Page-mode positional text yields one ``Document`` per extracted page."""
-    # ``pdf-inspector`` (verified on 0.2.6 and 1.25.2) filters pages using
-    # *1-based* page numbers (a quirk of this library version), so the
-    # documented 0-indexed ``pages=[0, 1, 2]`` resolves to physical pages 1
-    # and 2 of the three-page fixture. We assert the actual behavior so the
-    # test stays truthful about what the library returns.
+    """Page-mode positional text yields one ``Document`` per requested page."""
+    # ``pages`` is 0-indexed, so ``[0, 1, 2]`` selects all three pages of the
+    # fixture and the parser translates them to upstream's 1-indexed argument.
     blob = _blob_from_pdf(plain_text_pdf)
     docs = PdfInspectorParser(
         mode="page", output="text", extract_positions=True, pages=[0, 1, 2]
     ).parse(blob)
 
-    assert [doc.metadata["page"] for doc in docs] == [1, 2]
+    assert [doc.metadata["page"] for doc in docs] == [1, 2, 3]
     for doc in docs:
         assert isinstance(doc.page_content, str)
         assert doc.page_content
     # The foxtrot marker lives on the second physical page.
     foxtrot_doc = next(doc for doc in docs if doc.metadata["page"] == 2)
     assert "plaintextsentinel-foxtrot" in foxtrot_doc.page_content
+
+
+@pytest.mark.requires("pdf_inspector")
+@pytest.mark.parametrize("pages", [[0, 1, 2], [1, 2]])
+def test_page_mode_positions_and_markdown_select_same_pages(
+    plain_text_pdf: Path, pages: list[int]
+) -> None:
+    """The same 0-indexed ``pages`` selection means the same pages in both paths."""
+    blob = _blob_from_pdf(plain_text_pdf)
+
+    positions_docs = PdfInspectorParser(
+        mode="page", output="text", extract_positions=True, pages=pages
+    ).parse(blob)
+    markdown_docs = PdfInspectorParser(
+        mode="page", output="markdown", pages=pages
+    ).parse(blob)
+
+    positions_pages = [doc.metadata["page"] for doc in positions_docs]
+    markdown_pages = [doc.metadata["page"] for doc in markdown_docs]
+    assert sorted(positions_pages) == sorted(markdown_pages)
 
 
 @pytest.mark.requires("pdf_inspector")

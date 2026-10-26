@@ -66,8 +66,9 @@ class PdfInspectorParser(BaseBlobParser):
     `"page"` mode; in `"single"` mode `pages` and `page_regions` are lenient:
     when they do not apply to the chosen extraction path they are silently
     ignored rather than raising. Inputs (`pages`/`page_regions`) are 0-indexed;
-    all output `page` metadata is 1-indexed. See `__init__` for the full
-    parameter documentation.
+    all output `page` metadata is 1-indexed. The same 0-indexed `pages`
+    selection therefore addresses the same logical pages in the positional-text
+    and markdown paths. See `__init__` for the full parameter documentation.
 
     Examples:
         Setup:
@@ -136,12 +137,21 @@ class PdfInspectorParser(BaseBlobParser):
                 `output="text"` it crops per page (one `Document` per page).
                 Requires `page_regions` and is mutually exclusive with
                 `extract_positions`.
-            pages: Pages to restrict extraction to (0-indexed). **Required in
-                `"page"` mode**: a non-empty list must be supplied (an empty
-                list or `None` raises `ValueError`). In `"single"` mode it is
-                lenient: `None` means the whole document and the value is
-                silently ignored when the chosen extraction path does not use
-                it (e.g. plain-text extraction).
+            pages: Pages to restrict extraction to, **0-indexed for every
+                mode and extraction path** (e.g. `[0, 2]` selects the first and
+                third pages). **Required in `"page"` mode**: a non-empty list
+                must be supplied (an empty list or `None` raises
+                `ValueError`). In `"single"` mode it is lenient: `None` means
+                the whole document and the value is silently ignored when the
+                chosen extraction path does not use it (e.g. plain-text
+                extraction). Out-of-range indices are not validated: the
+                positional-text path silently omits them, while the markdown
+                path emits an empty `Document` for each one (flagged
+                `needs_ocr=True`). Duplicate indices are collapsed to one
+                `Document` per page by the positional-text path, while the
+                markdown path emits one `Document` per occurrence in the
+                requested order. Negative indices are invalid and make the
+                underlying extraction fail.
             page_regions: Per-page regions to crop, required when
                 `extract_regions=True`. Each entry is `(page, [[x0, y0, x1,
                 y1], ...])`. Lenient: silently ignored unless `extract_regions`
@@ -263,7 +273,13 @@ class PdfInspectorParser(BaseBlobParser):
         from pdf_inspector import extract_text_with_positions_bytes
 
         data: bytes = blob.as_bytes()
-        pages: list[int] | None = self.pages if self.mode == "page" else None
+        # The public ``pages`` contract is 0-indexed, but upstream's
+        # ``extract_text_with_positions_bytes`` expects 1-indexed page numbers.
+        pages: list[int] | None = (
+            [page + 1 for page in self.pages]
+            if self.mode == "page" and self.pages is not None
+            else None
+        )
 
         try:
             result: list[TextItem] = extract_text_with_positions_bytes(
