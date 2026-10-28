@@ -240,25 +240,21 @@ class _PageDiagnosticsIndex:
         self._reasons = _index_page_values(
             diagnostics.get("ocr_reasons_by_page", []), "page"
         )
-        self._ocr: dict[str, Any] | None = diagnostics.get("ocr")
-        self._ocr_page_lists: dict[str, dict[int, list[Any]]] = {}
-        self._ocr_reasons: dict[int, list[Any]] = {}
-        self._ocr_pages: dict[int, list[Any]] = {}
-        if self._ocr is not None:
-            self._ocr_page_lists = {
-                field: _index_page_values(self._ocr[field])
-                for field in (
-                    *_DIAGNOSTIC_PAGE_LIST_FIELDS,
-                    *_OCR_DIAGNOSTIC_PAGE_LIST_FIELDS,
-                )
-                if field in self._ocr
-            }
-            self._ocr_reasons = _index_page_values(
-                self._ocr.get("ocr_reasons_by_page", []), "page"
+        self._ocr: dict[str, Any] = diagnostics["ocr"]
+        self._ocr_page_lists: dict[str, dict[int, list[Any]]] = {
+            field: _index_page_values(self._ocr[field])
+            for field in (
+                *_DIAGNOSTIC_PAGE_LIST_FIELDS,
+                *_OCR_DIAGNOSTIC_PAGE_LIST_FIELDS,
             )
-            self._ocr_pages = _index_page_values(
-                self._ocr.get("pages", []), "page_number"
-            )
+            if field in self._ocr
+        }
+        self._ocr_reasons: dict[int, list[Any]] = _index_page_values(
+            self._ocr.get("ocr_reasons_by_page", []), "page"
+        )
+        self._ocr_pages: dict[int, list[Any]] = _index_page_values(
+            self._ocr.get("pages", []), "page_number"
+        )
 
     def scoped(self, page: int) -> dict[str, Any]:
         """Return independent page-scoped diagnostics for `page`."""
@@ -268,7 +264,7 @@ class _PageDiagnosticsIndex:
                 scoped[field] = list(self._page_lists[field].get(page, ()))
             elif field == "ocr_reasons_by_page":
                 scoped[field] = copy.deepcopy(self._reasons.get(page, []))
-            elif field == "ocr" and self._ocr is not None:
+            elif field == "ocr":
                 scoped[field] = self._scoped_ocr(page)
             else:
                 scoped[field] = copy.deepcopy(value)
@@ -276,7 +272,6 @@ class _PageDiagnosticsIndex:
 
     def _scoped_ocr(self, page: int) -> dict[str, Any]:
         """Return independent page-scoped OCR diagnostics for `page`."""
-        assert self._ocr is not None
         scoped: dict[str, Any] = {}
         for field, value in self._ocr.items():
             if field in self._ocr_page_lists:
@@ -295,40 +290,18 @@ def _scope_diagnostics_metadata(
 ) -> dict[str, Any]:
     """Return a copy of `diagnostics` scoped to one 1-indexed page.
 
-    Page-number lists and OCR reason entries are filtered to `page`; scalar
-    document-wide fields and `cmap_gaps` (which upstream does not associate
-    with pages) are retained as document-level context.
+    Page-number lists and detection OCR reason entries are filtered to `page`;
+    scalar document-wide fields and `cmap_gaps` (which upstream does not
+    associate with pages) are retained as document-level context.
     """
     scoped: dict[str, Any] = dict(diagnostics)
     for field in _DIAGNOSTIC_PAGE_LIST_FIELDS:
-        if field in scoped:
-            scoped[field] = [value for value in scoped[field] if value == page]
+        scoped[field] = [value for value in scoped[field] if value == page]
     scoped["ocr_reasons_by_page"] = [
         reason
         for reason in scoped.get("ocr_reasons_by_page", [])
         if reason["page"] == page
     ]
-
-    ocr = scoped.get("ocr")
-    if ocr is not None:
-        scoped_ocr: dict[str, Any] = dict(ocr)
-        for field in (*_DIAGNOSTIC_PAGE_LIST_FIELDS, *_OCR_DIAGNOSTIC_PAGE_LIST_FIELDS):
-            if field in scoped_ocr:
-                scoped_ocr[field] = [
-                    value for value in scoped_ocr[field] if value == page
-                ]
-        scoped_ocr["ocr_reasons_by_page"] = [
-            reason
-            for reason in scoped_ocr.get("ocr_reasons_by_page", [])
-            if reason["page"] == page
-        ]
-        scoped_ocr["pages"] = [
-            result_page
-            for result_page in scoped_ocr.get("pages", [])
-            if result_page["page_number"] == page
-        ]
-        scoped["ocr"] = scoped_ocr
-
     return scoped
 
 
@@ -820,7 +793,7 @@ class PdfInspectorParser(BaseBlobParser):
             )
         elif self.output == "text" and self.extract_plain:
             yield from self._extract_plain_text(blob, base_metadata, structure_elements)
-        elif self.output == "markdown":
+        else:
             yield from self._extract_markdown(blob, base_metadata, structure_elements)
 
     def parse(self, blob: Blob) -> list[Document]:
@@ -1270,7 +1243,9 @@ class PdfInspectorParser(BaseBlobParser):
             if self.output == "text" and self.extract_regions:
                 assert self.page_regions is not None
                 pages = sorted({page + 1 for page, _ in self.page_regions})
-            elif self.pages is not None:
+            else:
+                # Page mode requires a non-empty ``pages`` list at construction.
+                assert self.pages is not None
                 pages = sorted({page + 1 for page in self.pages})
 
         try:

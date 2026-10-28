@@ -56,16 +56,28 @@ exclude = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--strict-markers"
+addopts = [
+  "--strict-markers",
+  "--cov=langchain_pdf_inspector",
+  "--cov-branch",
+  "--cov-report=term-missing",
+]
 pythonpath = ["src"]
 markers = [
     "requires(package): skip the test unless the optional package `package` is importable",
 ]
+
+[tool.coverage.run]
+source = ["langchain_pdf_inspector"]
+
+[tool.coverage.report]
+fail_under = 100
 
 [dependency-groups]
 dev = [
     "ipykernel>=7.3.0",
     "mypy>=2.3.0",
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
     "ruff>=0.9",
 ]

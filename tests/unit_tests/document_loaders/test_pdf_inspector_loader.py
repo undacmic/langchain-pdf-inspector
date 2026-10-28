@@ -549,6 +549,14 @@ class TestBaseLoaderHelpers:
         assert BasePDFLoader._is_s3_url(url) is is_s3
         assert BasePDFLoader._is_s3_presigned_url(url) is is_presigned
 
+    @pytest.mark.parametrize(
+        "helper",
+        [BasePDFLoader._is_s3_url, BasePDFLoader._is_s3_presigned_url],
+    )
+    def test_s3_helpers_reject_malformed_urls(self, helper: Any) -> None:
+        """Malformed URLs are classified as non-S3 instead of raising."""
+        assert helper("https://[invalid") is False
+
     @pytest.mark.requires("pdf_inspector")
     def test_base_loader_rejects_invalid_file_path(self) -> None:
         """Invalid paths raise a clear ``ValueError`` at construction."""

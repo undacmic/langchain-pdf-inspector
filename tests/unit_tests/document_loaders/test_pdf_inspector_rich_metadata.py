@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -496,6 +497,64 @@ def test_diagnostics_are_json_serializable_and_scoped(
             reason["page"] == page for reason in diagnostics["ocr_reasons_by_page"]
         )
         json.loads(json.dumps(doc.metadata))
+
+
+@pytest.mark.requires("pdf_inspector")
+def test_page_mode_positions_scope_detection_diagnostics(
+    plain_text_pdf: Path,
+) -> None:
+    """Page-mode positional documents scope detection page lists to their page."""
+    detection = SimpleNamespace(
+        pdf_type="text_based",
+        page_count=3,
+        pages_needing_ocr=[1, 2, 3],
+        ocr_reasons_by_page=[
+            SimpleNamespace(page=page, reasons=[f"reason-{page}"]) for page in (1, 2, 3)
+        ],
+        pages_with_tables=[1, 2],
+        pages_with_columns=[2, 3],
+        confidence=0.9,
+        is_complex_layout=False,
+        has_encoding_issues=False,
+        cmap_gaps=[],
+        title=None,
+        author=None,
+        subject=None,
+        keywords=None,
+        creator=None,
+        producer=None,
+        creation_date=None,
+        mod_date=None,
+    )
+    with mock.patch("pdf_inspector.detect_pdf_bytes", return_value=detection):
+        docs = PdfInspectorParser(
+            mode="page",
+            output="text",
+            pages=[0, 1],
+            extract_positions=True,
+            include_diagnostics=True,
+        ).parse(_blob_from_pdf(plain_text_pdf))
+
+    assert [doc.metadata["page"] for doc in docs] == [1, 2]
+    diagnostics_by_page = [doc.metadata["diagnostics"] for doc in docs]
+    assert diagnostics_by_page[0] == {
+        "pdf_type": "text_based",
+        "confidence": 0.9,
+        "is_complex_layout": False,
+        "pages_needing_ocr": [1],
+        "ocr_reasons_by_page": [{"page": 1, "reasons": ["reason-1"]}],
+        "pages_with_tables": [1],
+        "pages_with_columns": [],
+        "has_encoding_issues": False,
+        "cmap_gaps": [],
+    }
+    assert diagnostics_by_page[1]["pages_needing_ocr"] == [2]
+    assert diagnostics_by_page[1]["pages_with_tables"] == [2]
+    assert diagnostics_by_page[1]["pages_with_columns"] == [2]
+    assert diagnostics_by_page[1]["ocr_reasons_by_page"] == [
+        {"page": 2, "reasons": ["reason-2"]}
+    ]
+    json.loads(json.dumps([doc.metadata for doc in docs]))
 
 
 @pytest.mark.requires("pdf_inspector")

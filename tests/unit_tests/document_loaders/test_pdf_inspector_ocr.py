@@ -451,6 +451,26 @@ def test_ocr_page_mode_omits_nonexistent_pages(plain_text_pdf: Any) -> None:
 
 
 @pytest.mark.requires("pdf_inspector")
+def test_ocr_page_mode_omits_pages_upstream_did_not_return(
+    plain_text_pdf: Any,
+) -> None:
+    """Requested pages absent from the OCR result (for example, native pages) are omitted."""
+    with mock.patch(
+        "pdf_inspector.process_pdf_with_ocr_bytes",
+        return_value=_ocr_result([2], page_count=3),
+    ):
+        docs = PdfInspectorParser(
+            mode="page",
+            output="markdown",
+            pages=[2, 1],
+            ocr_mode="auto",
+        ).parse(_blob_from_pdf(plain_text_pdf))
+
+    assert [doc.metadata["page"] for doc in docs] == [2]
+    assert [doc.page_content for doc in docs] == ["ocr-page-2"]
+
+
+@pytest.mark.requires("pdf_inspector")
 def test_ocr_disabled_never_calls_upstream(plain_text_pdf: Any) -> None:
     """The default ``ocr_mode="off"`` leaves the existing extraction path untouched."""
     with mock.patch("pdf_inspector.process_pdf_with_ocr_bytes") as mocked:
@@ -565,6 +585,30 @@ def test_ocr_missing_model_or_runtime_error_is_actionable_and_preserves_cause(
     assert "model_directory" in message
     assert "PDFIUM_LIB_PATH" in message
     assert "ORT_DYLIB_PATH" in message
+    assert exc_info.value.__cause__ is upstream_error
+
+
+@pytest.mark.requires("pdf_inspector")
+def test_ocr_error_when_downloads_are_permitted_mentions_network(
+    plain_text_pdf: Any,
+) -> None:
+    """With ``offline=False``, the OCR error points at network/cache failures."""
+    upstream_error = RuntimeError("model download failed")
+    with (
+        mock.patch(
+            "pdf_inspector.process_pdf_with_ocr_bytes", side_effect=upstream_error
+        ),
+        pytest.raises(RuntimeError) as exc_info,
+    ):
+        PdfInspectorParser(
+            output="markdown",
+            ocr_mode="force",
+            offline=False,
+        ).parse(_blob_from_pdf(plain_text_pdf))
+
+    message = str(exc_info.value)
+    assert "offline=False" in message
+    assert "network access" in message
     assert exc_info.value.__cause__ is upstream_error
 
 

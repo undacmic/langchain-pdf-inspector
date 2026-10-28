@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
+from unittest import mock
 
 import pytest
 from langchain_core.documents import Document
@@ -551,6 +554,87 @@ def test_invalid_arguments_raise_value_error(
     """Invalid constructor arguments are rejected with a clear ``ValueError``."""
     with pytest.raises(ValueError, match=error_fragment):
         PdfInspectorParser(**kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Upstream failures and metadata fallbacks
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requires("pdf_inspector")
+def test_missing_pdf_inspector_raises_import_error(plain_text_pdf: Path) -> None:
+    """A missing ``pdf_inspector`` package raises a friendly ``ImportError``."""
+    with (
+        mock.patch.dict(sys.modules, {"pdf_inspector": None}),
+        pytest.raises(ImportError, match="pdf_inspector.*not found"),
+    ):
+        PdfInspectorParser().parse(_blob_from_pdf(plain_text_pdf))
+
+
+@pytest.mark.requires("pdf_inspector")
+@pytest.mark.parametrize(
+    ("parser_kwargs", "upstream_name", "message"),
+    [
+        ({}, "extract_text_bytes", "plain text"),
+        (
+            {"extract_positions": True},
+            "extract_text_with_positions_bytes",
+            "text with positions",
+        ),
+        (
+            {"extract_positions": True, "include_position_metadata": True},
+            "extract_text_with_positions_and_rotations_bytes",
+            "text with positions",
+        ),
+        (
+            {"extract_regions": True, "page_regions": [FOXTROT_REGION]},
+            "extract_text_in_regions_bytes",
+            "page regions",
+        ),
+        ({"output": "markdown"}, "extract_pages_markdown_bytes", "per-page markdown"),
+    ],
+)
+def test_upstream_extraction_failures_preserve_cause(
+    plain_text_pdf: Path,
+    parser_kwargs: dict[str, Any],
+    upstream_name: str,
+    message: str,
+) -> None:
+    """Each extraction path wraps upstream failures and keeps the original cause."""
+    upstream_error = ValueError("upstream extraction failed")
+    with (
+        mock.patch(f"pdf_inspector.{upstream_name}", side_effect=upstream_error),
+        pytest.raises(RuntimeError) as exc_info,
+    ):
+        PdfInspectorParser(**parser_kwargs).parse(_blob_from_pdf(plain_text_pdf))
+
+    assert message in str(exc_info.value)
+    assert exc_info.value.__cause__ is upstream_error
+
+
+@pytest.mark.requires("pdf_inspector")
+def test_detection_metadata_omits_missing_values(plain_text_pdf: Path) -> None:
+    """Successful detection with missing fields omits them instead of emitting nulls."""
+    detection = SimpleNamespace(
+        pdf_type=None,
+        page_count=None,
+        title=None,
+        author=None,
+        subject=None,
+        keywords=None,
+        creator=None,
+        producer=None,
+        creation_date=None,
+        mod_date=None,
+    )
+    with mock.patch("pdf_inspector.detect_pdf_bytes", return_value=detection):
+        metadata = (
+            PdfInspectorParser().parse(_blob_from_pdf(plain_text_pdf))[0].metadata
+        )
+
+    assert metadata["source"].endswith("plain_text.pdf")
+    assert metadata["page"] == 1
+    assert {"pdf_type", "total_pages", "title"} & metadata.keys() == set()
 
 
 # ---------------------------------------------------------------------------
