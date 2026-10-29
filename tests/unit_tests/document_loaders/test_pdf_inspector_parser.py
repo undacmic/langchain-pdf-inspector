@@ -518,7 +518,7 @@ def test_lazy_parse_matches_parse(plain_text_pdf: Path) -> None:
         eager = parser.parse(blob)
         lazy = list(parser.lazy_parse(blob))
         assert len(eager) == len(lazy)
-        for eager_doc, lazy_doc in zip(eager, lazy):
+        for eager_doc, lazy_doc in zip(eager, lazy, strict=True):
             assert eager_doc.page_content == lazy_doc.page_content
             assert eager_doc.metadata == lazy_doc.metadata
 

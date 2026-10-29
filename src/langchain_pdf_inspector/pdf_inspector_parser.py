@@ -404,7 +404,7 @@ class PdfInspectorParser(BaseBlobParser):
     - `"page"`: yields one `Document` per page. `pages` is **required** (a
       non-empty list of 0-indexed pages) and the content branches on `output`:
       `"text"` emits each page's plain text (the page's items joined with a
-      newline; pages with no non-empty text are skipped), `"markdown"` emits
+      space; pages with no non-empty text are skipped), `"markdown"` emits
       each page's markdown with the per-page layout flags, and OCR markdown
       emits one `Document` per requested page. `output` defaults to `"text"`,
       so page mode yields per-page plain text unless `output="markdown"` is
@@ -474,7 +474,9 @@ class PdfInspectorParser(BaseBlobParser):
 
             from langchain_pdf_inspector import PdfInspectorParser
 
-            parser = PdfInspectorParser(mode="page", pages=[0, 1, 2])
+            parser = PdfInspectorParser(
+                mode="page", pages=[0, 1, 2], output="markdown"
+            )
 
         Lazily parse the blob:
 
@@ -516,13 +518,14 @@ class PdfInspectorParser(BaseBlobParser):
             output: `"text"` or `"markdown"` for the content produced. In
                 `"single"` mode this selects plain text vs. markdown. In
                 `"page"` mode it selects per-page plain text (items joined with
-                a newline) vs. per-page markdown with layout flags
+                spaces) vs. per-page markdown with layout flags
                 (`"markdown"`). Defaults to `"text"`.
             extract_positions: When `True` in `"single"` mode, extract
                 positional text and emit one joined `Document` whose pages are
                 joined with `page_delimiter`. In `"page"` mode with
                 `output="text"` the same positional-text path is used per page
-                (one `Document` per page, without any positions metadata).
+                (one `Document` per page; positions metadata is added only when
+                `include_position_metadata=True`).
                 Mutually exclusive with `extract_regions`.
             extract_regions: When `True`, extract text only from the regions
                 given in `page_regions`. In `"single"` mode this crops the whole
@@ -768,11 +771,11 @@ class PdfInspectorParser(BaseBlobParser):
         """
         try:
             import pdf_inspector  # noqa: F401 - availability check
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "`pdf_inspector` package not found, please install it with "
                 "`pip install pdf-inspector`"
-            )
+            ) from e
 
         base_metadata: dict[str, Any] = _build_base_metadata(
             blob, include_diagnostics=self.include_diagnostics

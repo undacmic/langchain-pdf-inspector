@@ -5,7 +5,10 @@ from langchain_pdf_inspector import PdfInspectorLoader, PdfInspectorParser
 ```
 
 `PdfInspectorLoader` wraps `PdfInspectorParser` with path resolution (local,
-HTTP(S), and S3), temporary-file handling, and caller metadata merging.
+HTTP(S), including presigned S3 HTTPS URLs), temporary-file handling, and caller
+metadata merging. Bare `s3://` URIs raise `ValueError`; download locally or use a
+presigned HTTPS URL. Downloads use 10-second connection and 60-second read
+timeouts, with immediate temporary-file cleanup on failure.
 
 ## `PdfInspectorParser`
 

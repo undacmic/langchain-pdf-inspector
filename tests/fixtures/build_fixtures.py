@@ -75,6 +75,7 @@ SOURCES = [
     "complex_layout",
     "cropbox_offset",
     "document_info",
+    "empty_pages",
 ]
 
 # Small deterministic fixtures written directly by this script (no TeX).

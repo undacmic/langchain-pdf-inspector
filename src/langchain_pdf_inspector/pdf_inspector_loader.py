@@ -1,6 +1,6 @@
 """LangChain document loader integration for `pdf-inspector`.
 
-Provides `BasePDFLoader`, which resolves local, web and S3 PDF paths (downloading
+Provides `BasePDFLoader`, which resolves local and HTTP(S) PDF paths (downloading
 web paths to a temporary file), and `PdfInspectorLoader`, which parses those
 paths into LangChain `Document` objects using the `pdf-inspector` library.
 """
@@ -8,12 +8,11 @@ paths into LangChain `Document` objects using the `pdf-inspector` library.
 from __future__ import annotations
 
 import os
-import re
 import tempfile
 from abc import ABC
 from collections.abc import Iterator
 from pathlib import PurePath
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 import requests
@@ -31,11 +30,14 @@ class BasePDFLoader(BaseLoader, ABC):
         clean up the temporary file after completion.
     """
 
-    def __init__(self, file_path: str | PurePath, *, headers: dict | None = None):
+    def __init__(
+        self, file_path: str | PurePath, *, headers: dict[str, str] | None = None
+    ) -> None:
         """Initialize with a file path.
 
         Args:
-            file_path: Either a local, S3 or web path to a PDF file.
+            file_path: A local path or HTTP(S) URL, including presigned S3 URLs.
+                Bare S3 URIs are not supported.
             headers: Headers to use for GET request to download a file from a web path.
         """
         self.file_path = str(file_path)
@@ -44,26 +46,31 @@ class BasePDFLoader(BaseLoader, ABC):
         if "~" in self.file_path:
             self.file_path = os.path.expanduser(self.file_path)
 
-        # If the file is a web path or S3, download it to a temporary file,
-        # and use that. It's better to use a BlobLoader.
         if not os.path.isfile(self.file_path) and self._is_valid_url(self.file_path):
+            if self._is_s3_url(self.file_path):
+                raise ValueError(
+                    "Bare s3:// URIs are not supported; use a presigned HTTPS URL "
+                    "or download the PDF to a local file first."
+                )
             self.temp_dir = tempfile.TemporaryDirectory()
-            _, suffix = os.path.splitext(self.file_path)
-            if self._is_s3_presigned_url(self.file_path):
-                suffix = urlparse(self.file_path).path.split("/")[-1]
-            temp_pdf = os.path.join(self.temp_dir.name, f"tmp{suffix}")
+            # Never incorporate an untrusted URL path or signed query in a filename.
+            temp_pdf = os.path.join(self.temp_dir.name, "tmp.pdf")
             self.web_path = self.file_path
-            if not self._is_s3_url(self.file_path):
-                r = requests.get(self.file_path, headers=self.headers)
-                if r.status_code != 200:
+            try:
+                response = requests.get(
+                    self.file_path, headers=self.headers, timeout=(10, 60)
+                )
+                if response.status_code != 200:
                     raise ValueError(
                         "Check the url of your file; returned status code "
-                        f"{r.status_code}"
+                        f"{response.status_code}"
                     )
-
                 with open(temp_pdf, mode="wb") as f:
-                    f.write(r.content)
+                    f.write(response.content)
                 self.file_path = str(temp_pdf)
+            except Exception:
+                self.temp_dir.cleanup()
+                raise
         elif not os.path.isfile(self.file_path):
             raise ValueError(f"File path {self.file_path} is not a valid file or url")
 
@@ -86,15 +93,6 @@ class BasePDFLoader(BaseLoader, ABC):
         except ValueError:
             return False
 
-    @staticmethod
-    def _is_s3_presigned_url(url: str) -> bool:
-        """Check if the url is a presigned S3 url."""
-        try:
-            result = urlparse(url)
-            return bool(re.search(r"\.s3\.amazonaws\.com$", result.netloc))
-        except ValueError:
-            return False
-
     @property
     def source(self) -> str:
         return self.web_path if self.web_path is not None else self.file_path
@@ -103,7 +101,7 @@ class BasePDFLoader(BaseLoader, ABC):
 class PdfInspectorLoader(BasePDFLoader):
     """Load PDF files into LangChain `Document` objects via `pdf-inspector`.
 
-    Thin wrapper around `PdfInspectorParser` that resolves a local, web or S3
+    Thin wrapper around `PdfInspectorParser` that resolves a local or HTTP(S)
     PDF path (downloading web paths to a temporary file via `BasePDFLoader`)
     and merges optional caller-supplied `metadata` on top of each parsed
     document.
@@ -150,7 +148,7 @@ class PdfInspectorLoader(BasePDFLoader):
     def __init__(
         self,
         file_path: str | PurePath,
-        headers: dict | None = None,
+        headers: dict[str, str] | None = None,
         extract_images: bool = False,
         *,
         mode: Literal["single", "page"] = "single",
@@ -171,12 +169,13 @@ class PdfInspectorLoader(BasePDFLoader):
         include_position_metadata: bool = False,
         include_structure: bool = False,
         include_diagnostics: bool = False,
-        metadata: dict | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the loader.
 
         Args:
-            file_path: Local, web, or S3 path to a PDF file.
+            file_path: Local path or HTTP(S) URL, including presigned S3 URLs.
+                Bare S3 URIs are rejected with guidance to use a presigned URL.
             headers: Headers used for the GET request when `file_path` is a
                 web URL.
             extract_images: Reserved for future image extraction. Only `False`
@@ -268,11 +267,11 @@ class PdfInspectorLoader(BasePDFLoader):
             )
         try:
             import pdf_inspector  # noqa:F401
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "`pdf_inspector` package not found, please install it with "
                 "`pip install pdf-inspector`"
-            )
+            ) from e
         super().__init__(file_path, headers=headers)
         self.parser: PdfInspectorParser = PdfInspectorParser(
             mode=mode,
@@ -294,7 +293,7 @@ class PdfInspectorLoader(BasePDFLoader):
             include_structure=include_structure,
             include_diagnostics=include_diagnostics,
         )
-        self.metadata: dict | None = metadata
+        self.metadata: dict[str, Any] | None = metadata
 
     def _merge_metadata(self, document: Document) -> Document:
         """Merge caller-supplied `metadata` on top of a parsed `Document`.
@@ -314,7 +313,7 @@ class PdfInspectorLoader(BasePDFLoader):
         default), one `Document` per page (`mode="page"`), or one `Document`
         for the whole file when `extract_positions` is set in single mode. In
         `mode="page"` the content branches on `output`: `"text"` yields
-        per-page plain text (items joined with a newline; empty pages skipped),
+        per-page plain text (items joined with spaces; empty pages skipped),
         `"markdown"` yields per-page markdown with layout flags, and enabled
         OCR yields one `Document` per requested page in the caller's requested
         order (duplicates preserved). `output` defaults to `"text"`; OCR
@@ -353,5 +352,5 @@ class PdfInspectorLoader(BasePDFLoader):
             blob: Blob = Blob.from_data(data, path=self.web_path)
         else:
             blob = Blob.from_path(self.file_path)
-        for document in self.parser.parse(blob):
+        for document in self.parser.lazy_parse(blob):
             yield self._merge_metadata(document)

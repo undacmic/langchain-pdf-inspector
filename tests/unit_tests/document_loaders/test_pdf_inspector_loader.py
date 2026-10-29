@@ -18,7 +18,7 @@ from langchain_pdf_inspector.pdf_inspector_loader import BasePDFLoader
 from ._markup import has_list_item, normalize_table_markup
 
 # Conftest fixture names that resolve to the absolute path of each built PDF
-# (skipping the test with an actionable message when the PDF is absent).
+# (failing the test with an actionable message when the PDF is absent).
 FIXTURE_NAMES = [
     "plain_text_pdf",
     "headings_pdf",
@@ -50,7 +50,7 @@ class _FakeParser:
         yield Document(page_content="fake-page-content", metadata={"source": "fake"})
 
     def parse(self, blob: Blob) -> list[Document]:
-        """Return the fixed ``Document`` list (``lazy_load`` calls ``parse``)."""
+        """Return the same fixed documents as the streaming parser interface."""
         return list(self.lazy_parse(blob))
 
 
@@ -414,14 +414,15 @@ class TestArgumentValidation:
         """A missing ``pdf_inspector`` package raises a friendly ``ImportError``."""
         with (
             mock.patch.dict(sys.modules, {"pdf_inspector": None}),
-            pytest.raises(ImportError, match="pdf_inspector.*not found"),
+            pytest.raises(ImportError, match="pdf_inspector.*not found") as error,
         ):
             PdfInspectorLoader(str(plain_text_pdf))
+        assert isinstance(error.value.__cause__, ImportError)
 
 
 @pytest.mark.requires("pdf_inspector")
 class TestPathResolution:
-    """Local, web and S3 path resolution in ``BasePDFLoader``."""
+    """Local/HTTP path resolution and bare S3 rejection in ``BasePDFLoader``."""
 
     def test_web_url_is_downloaded_and_loaded(self, plain_text_pdf: Path) -> None:
         """A web URL is downloaded via ``requests.get`` and then parsed."""
@@ -441,7 +442,7 @@ class TestPathResolution:
             assert loader.web_path == url
             assert loader.source == url
             assert loader.file_path != url
-            mocked_get.assert_called_once_with(url, headers=headers)
+            mocked_get.assert_called_once_with(url, headers=headers, timeout=(10, 60))
 
             docs = loader.load()
         assert len(docs) == 1
@@ -461,17 +462,17 @@ class TestPathResolution:
         ):
             PdfInspectorLoader("https://example.com/missing.pdf")
 
-    def test_s3_scheme_url_is_not_downloaded(self) -> None:
-        """A plain ``s3://`` URL is detected without a download in ``__init__``."""
+    def test_s3_scheme_url_is_rejected_with_presigned_url_guidance(self) -> None:
+        """Bare S3 URIs must not masquerade as successfully resolved local files."""
         url = "s3://my-bucket/docs/report.pdf"
-        with mock.patch(
-            "langchain_pdf_inspector.pdf_inspector_loader.requests.get"
-        ) as mocked_get:
-            loader = PdfInspectorLoader(url)
-
-            assert loader.web_path == url
-            assert loader.file_path == url
-            mocked_get.assert_not_called()
+        with (
+            mock.patch(
+                "langchain_pdf_inspector.pdf_inspector_loader.requests.get"
+            ) as mocked_get,
+            pytest.raises(ValueError, match="presigned HTTPS URL"),
+        ):
+            PdfInspectorLoader(url).load()
+        mocked_get.assert_not_called()
 
     def test_presigned_s3_url_is_downloaded(self, plain_text_pdf: Path) -> None:
         """A presigned S3 URL is downloaded like a regular web URL."""
@@ -533,29 +534,23 @@ class TestBaseLoaderHelpers:
         assert BasePDFLoader._is_valid_url(url) is expected
 
     @pytest.mark.parametrize(
-        ("url", "is_s3", "is_presigned"),
+        ("url", "is_s3"),
         [
-            ("s3://bucket/key.pdf", True, False),
+            ("s3://bucket/key.pdf", True),
             (
                 "https://bucket.s3.amazonaws.com/key.pdf?X-Amz-Signature=test",
                 False,
-                True,
             ),
-            ("https://example.test/file.pdf", False, False),
+            ("https://example.test/file.pdf", False),
         ],
     )
-    def test_s3_helpers(self, url: str, is_s3: bool, is_presigned: bool) -> None:
-        """``_is_s3_url`` and ``_is_s3_presigned_url`` classify S3 paths."""
+    def test_s3_helper(self, url: str, is_s3: bool) -> None:
+        """Only bare S3 URIs require rejection; presigned HTTPS URLs can download."""
         assert BasePDFLoader._is_s3_url(url) is is_s3
-        assert BasePDFLoader._is_s3_presigned_url(url) is is_presigned
 
-    @pytest.mark.parametrize(
-        "helper",
-        [BasePDFLoader._is_s3_url, BasePDFLoader._is_s3_presigned_url],
-    )
-    def test_s3_helpers_reject_malformed_urls(self, helper: Any) -> None:
+    def test_s3_helper_rejects_malformed_urls(self) -> None:
         """Malformed URLs are classified as non-S3 instead of raising."""
-        assert helper("https://[invalid") is False
+        assert BasePDFLoader._is_s3_url("https://[invalid") is False
 
     @pytest.mark.requires("pdf_inspector")
     def test_base_loader_rejects_invalid_file_path(self) -> None:

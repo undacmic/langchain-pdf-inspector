@@ -3,6 +3,9 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 6 * * 1"
 
 permissions:
   contents: read
@@ -12,16 +15,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
-    name: Lint, format, type-check & test (Python 3.12)
+  quality:
+    name: Lint, format & type-check (Python 3.12)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install uv and Python 3.12
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           python-version: "3.12"
 
@@ -37,22 +41,21 @@ jobs:
       - name: Type-check (mypy)
         run: uv run mypy src
 
-      - name: Verify checked-in PDF fixtures (no TeX required)
-        run: uv run python tests/fixtures/build_fixtures.py --check
-
-      - name: Run tests (real fixtures, no missing-fixture skips)
-        run: uv run pytest
+  test:
+    name: Compatibility
+    uses: ./.github/workflows/compatibility.yml
 
   build:
     name: Build & check distributions (Python 3.12)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install uv and Python 3.12
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           python-version: "3.12"
 

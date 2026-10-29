@@ -15,6 +15,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: Implementation :: CPython",
     "Topic :: Text Processing",
     "Typing :: Typed",
@@ -57,9 +59,9 @@ exclude = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = [
+  "--strict-config",
   "--strict-markers",
   "--cov=langchain_pdf_inspector",
-  "--cov-branch",
   "--cov-report=term-missing",
 ]
 pythonpath = ["src"]
@@ -69,9 +71,18 @@ markers = [
 
 [tool.coverage.run]
 source = ["langchain_pdf_inspector"]
+branch = true
 
 [tool.coverage.report]
 fail_under = 100
+precision = 2
+show_missing = true
+
+[tool.ruff.lint]
+extend-select = ["I", "UP", "B"]
+
+[tool.mypy]
+strict = true
 
 [dependency-groups]
 dev = [

@@ -20,7 +20,7 @@ uv add langchain-pdf-inspector
 
 Requires Python 3.12+, `langchain-core>=1.5.3,<2`, and
 `pdf-inspector>=1.25.2,<2`. `pdf-inspector` is a required runtime dependency;
-if it is missing, constructing the loader or parser raises a clear
+if it is missing, constructing the loader or parsing a blob raises a clear
 `ImportError`.
 
 ## Quick start
@@ -33,9 +33,11 @@ for doc in loader.load():  # or loader.lazy_load()
     print(doc.metadata["page"], doc.page_content[:80])
 ```
 
-The loader accepts local paths, `http(s)://` URLs, and S3 paths. Remote files
-are downloaded to a temporary file, which is removed when the loader is
-released. For direct blob parsing without path resolution, use
+The loader accepts local paths and `http(s)://` URLs, including presigned S3
+HTTPS URLs. Bare `s3://` URIs are rejected; use a presigned URL or download the
+PDF locally first. Downloads use a 10-second connection timeout and a 60-second
+read timeout. Remote files are downloaded to a temporary file, which is removed
+when the loader is released (or immediately if downloading fails). For direct blob parsing without path resolution, use
 `PdfInspectorParser`:
 
 ```python
@@ -184,7 +186,10 @@ uv run pytest tests/unit_tests/document_loaders/test_pdf_inspector_ocr.py \
 ```
 
 Add `--no-cov` to focused test runs; the default coverage gate applies to the
-full suite.
+full suite. See [testing and code-quality standards](docs/testing.md) for the
+LangChain interface contracts, meaningful-test requirements, and coverage policy.
+CI tests Python 3.12–3.14 on Linux, plus Python 3.12 on macOS and Windows, with
+additional minimum/latest-allowed dependency checks on Python 3.12 and 3.14.
 
 ## Links
 

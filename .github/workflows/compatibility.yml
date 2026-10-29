@@ -1,0 +1,63 @@
+name: Compatibility
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python ${{ matrix.python }} / ${{ matrix.os }} / ${{ matrix.dependencies }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, python: "3.12", dependencies: locked}
+          - {os: ubuntu-latest, python: "3.13", dependencies: locked}
+          - {os: ubuntu-latest, python: "3.14", dependencies: locked}
+          - {os: macos-15, python: "3.12", dependencies: locked}
+          - {os: windows-latest, python: "3.12", dependencies: locked}
+          - {os: ubuntu-latest, python: "3.12", dependencies: lowest-direct}
+          - {os: ubuntu-latest, python: "3.14", dependencies: lowest-direct}
+          - {os: ubuntu-latest, python: "3.12", dependencies: highest}
+          - {os: ubuntu-latest, python: "3.14", dependencies: highest}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install uv and Python ${{ matrix.python }}
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install locked dependencies
+        if: matrix.dependencies == 'locked'
+        run: uv sync --group dev --locked
+
+      # These jobs deliberately re-resolve the disposable checkout's lockfile.
+      # --upgrade prevents the committed lock from masking either bound.
+      - name: Resolve dependency bounds
+        if: matrix.dependencies != 'locked'
+        run: uv sync --group dev --upgrade --resolution ${{ matrix.dependencies }}
+
+      - name: Report runtime versions and check declared constraints
+        if: matrix.dependencies != 'lowest-direct'
+        run: uv run --no-sync python tests/check_dependency_bounds.py
+
+      - name: Verify exact declared minimum runtime versions
+        if: matrix.dependencies == 'lowest-direct'
+        run: uv run --no-sync python tests/check_dependency_bounds.py --minimum
+
+      - name: Check installed dependency consistency
+        run: uv pip check
+
+      - name: Verify checked-in PDF fixtures (no TeX required)
+        run: uv run --no-sync python tests/fixtures/build_fixtures.py --check
+
+      # Never let uv run silently re-sync a bound-testing environment.
+      - name: Run the full suite with 100% statement and branch coverage
+        run: uv run --no-sync pytest
